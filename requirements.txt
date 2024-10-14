@@ -1,6 +1,8 @@
-PyMuPDF  
-openai 
-python-dotenv  
-regex  
-streamlit 
-python-docx  
+PyMuPDF
+openai
+python-dotenv
+regex
+streamlit
+python-docx
+azure-ai-formrecognizer
+azure-core
