@@ -1,0 +1,6 @@
+PyMuPDF  
+openai 
+python-dotenv  
+regex  
+streamlit 
+python-docx  
