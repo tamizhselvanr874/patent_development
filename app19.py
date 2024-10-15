@@ -2,7 +2,7 @@ import fitz  # PyMuPDF for PDF extraction
 from openai import AzureOpenAI  
 from dotenv import load_dotenv  
 import os  
-import re  # For parsing structured output  
+import re  # For parsing structured output  z
 import json  # For JSON handling  
 import pandas as pd  
 import streamlit as st  
@@ -70,7 +70,6 @@ def extract_text_from_docx(uploaded_docx):
         full_text.append(para.text)  
     return "\n".join(full_text)  
   
-  
 def determine_domain_expertise(action_document_text):  
     """Analyze the action document to determine the required domain expertise, experience, and analysis style."""  
     global domain_subject_matter, experience_expertise_qualifications, style_tone_voice
@@ -84,9 +83,9 @@ def determine_domain_expertise(action_document_text):
     NOTE: Each answer needs to be detailed.  
     Step 4: Provide the response in the following JSON format:  
     {{  
-        "domain_subject_matter": "Description of the domain subject matter",  
-        "experience_expertise_qualifications": "Description of the experience, expertise, and educational qualifications required",  
-        "style_tone_voice": "Description of the style, tone, and voice required"  
+        "domain_subject_matter": " Detailed description of the domain subject matter",  
+        "experience_expertise_qualifications": "Detailed description of the experience, expertise, and educational qualifications required",  
+        "style_tone_voice": "Detailed description of the style, tone, and voice required"  
     }}  
     """  
   
@@ -145,85 +144,147 @@ def determine_domain_expertise(action_document_text):
         st.error(f"Error during domain expertise determination: {e}")  
         return (None, None, None)  
   
-  
-def check_for_conflicts(action_document_text):  
-    """  
-    Analyzes the action document and extracts:  
-    - Foundational claim  
-    - Referenced documents  
-    - Figures and technical text related to them  
-    """  
-    global domain_subject_matter, experience_expertise_qualifications, style_tone_voice  
-    # Escape curly braces in the action_document_text  
-    escaped_text = action_document_text.replace("{", "{{").replace("}", "}}")  
-  
-    prompt = f"""  
-    Analyze the following action document text and extract the foundational claim:  
-    {escaped_text}  
-    Step 1: Extract the key claims from the document and name it as 'Key_claims'.  
-    Step 2: From the 'Key_claims' extract the foundational claim and store it in a variable called "foundational_claim" (Note: method claims and system claims are not considered independent claims and only one claim can be the foundational claim).  
-    Step 3: From the foundational claim, extract the information under U.S.C 102 and/or 103.  
-    Step 4: Extract all referenced documents under U.S.C. 102 and/or 103 mentioned in the action document specified only in the "foundational_claim".  
-    Step 5: For each referenced document, create a variable that stores the document name.  
-    Step 6: If the foundational claim refers to the referenced documents, extract the entire technical content with its specified paragraph location and image reference. Map the claim with the conflicting document name.  
+def check_for_conflicts(action_document_text, domain, expertise, style):
+    """
+    Analyzes the action document and extracts:
+    - Foundational claim
+    - Referenced documents
+    - Figures and technical text related to them
+    """
+    global domain_subject_matter, experience_expertise_qualifications, style_tone_voice
+    
+    # Escape curly braces in the action_document_text
+    escaped_text = action_document_text.replace("{", "{{").replace("}", "}}")
+
+    # The content with placeholders dynamically filled
+    content = f"""
+    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+
+    1. {domain}
+    2. Patent Law Proficiency: 
+    a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
+    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+
+    3. {expertise}
+    4. Capability to Propose Amendments:
+    a. Experienced in responding to examiners’ assertions or rejections of claims.
+    b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+    c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
+
+    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+
+    a. A thorough evaluation of the technical details and functionalities described in the patent application.
+    b. An assessment of the clarity and precision of the technical descriptions and diagrams.
+    c. An analysis of the novelty (under U.S.C 102) and non-obviousness (under U.S.C 103) of the subject matter by comparing it with similar existing documents.
+    d. Feedback on the strengths and potential areas for improvement in the document.
+    e. A determination of whether the invention meets the criteria for patentability under sections U.S.C 102 and U.S.C 103.
+    f. Proposals for suitable amendments to the claims in response to potential examiners’ assertions or rejections, ensuring the claims are robust and meet patentability standards.
+
+    Using this expertise, experience, and educational background, analyze the provided patent application document with a focus on its technical accuracy, clarity, adherence to patent application standards, novelty, non-obviousness, and overall feasibility.
+    """
+    # Print the content to the terminal
+    print("Generated Content for LLM:\n")
+    print(content)
+
+    # Formulate the prompt to be sent to the LLM
+    prompt = f"""
+    Analyze the following action document text and extract the foundational claim:
+    {escaped_text}
+    Step 1: Extract the key claims from the document and name it as 'Key_claims'.
+    Step 2: From the 'Key_claims' extract the foundational claim and store it in a variable called "foundational_claim" (Note: method claims and system claims are not considered independent claims and only one claim can be the foundational claim).
+    Step 3: From the foundational claim, extract the information under U.S.C 102 and/or 103.
+    Step 4: Extract all referenced documents under U.S.C. 102 and/or 103 mentioned in the action document specified only in the "foundational_claim".
+    Step 5: For each referenced document, create a variable that stores the document name.
+    Step 6: If the foundational claim refers to the referenced documents, extract the entire technical content with its specified paragraph location and image reference. Map the claim with the conflicting document name.
     Step 7: Do not extract any referenced document data that is not related to the foundational claim.   
-    NOTE: Extract in English.  
-    Step 8: Return the output as a JSON object with the following structure:  
-    {{  
-        "foundational_claim": "text",  
-        "documents_referenced": ["doc1", "doc2", ...],  
-        "figures": ["fig1", "fig2", ...],  
-        "text": "detailed text"  
-    }}  
-    """  
-  
-    messages = [  
-        {  
-            "role": "system",  
-            "content": f"You are a patent attorney with expertise in {domain_subject_matter} analyzing the document for foundational claims and conflicts. Your experience and qualifications include {experience_expertise_qualifications}, and you approach this task with a {style_tone_voice} style."  
-        },  
-        {  
-            "role": "user",  
-            "content": prompt,  
-        },  
-    ]  
-  
-    # Call OpenAI API for conflict checking  
-    try:  
-        response = client.chat.completions.create(  
-            model="GPT-4-Omni", messages=messages, temperature=0.6  
-        )  
-        # Extract the content and remove the triple backticks  
-        content = response.choices[0].message.content.strip()  
-  
-        if content.startswith("```json"):  
-            content = content[7:-3].strip()  
-        elif content.startswith("```"):  
-            content = content[3:-3].strip()  
-  
-        # Print the raw response for debugging  
-        print(f"Raw response: {response.choices[0].message.content}")  
-  
-        # Parse the JSON content  
-        return json.loads(content)  
-  
-    except json.JSONDecodeError as e:  
-        print(f"JSON decoding error: {e}")  
-        print(f"Raw response: {response.choices[0].message.content}")  
-        return None  
-    except Exception as e:  
-        print(f"Error during conflict checking: {e}")  
-        return None  
+    NOTE: Extract in English.
+    Step 8: Return the output as a JSON object with the following structure:
+    {{
+        "foundational_claim": "text",
+        "documents_referenced": ["doc1", "doc2", ...],
+        "figures": ["fig1", "fig2", ...],
+        "text": "detailed text"
+    }}
+    """
+
+    messages = [
+        {
+            "role": "system",
+            "content": content  # dynamically generated content for the LLM's role
+        },
+        {
+            "role": "user",
+            "content": prompt,  # prompt asking the user for conflict analysis
+        },
+    ]
+
+    # Call the OpenAI API for conflict checking (assuming you have client setup)
+    try:
+        response = client.chat.completions.create(
+            model="GPT-4-Omni", messages=messages, temperature=0.2
+        )
+        # Extract the content and remove the triple backticks if necessary
+        content = response.choices[0].message.content.strip()
+
+        if content.startswith("```json"):
+            content = content[7:-3].strip()
+        elif content.startswith("```"):
+            content = content[3:-3].strip()
+
+        # Print the raw response for debugging
+        print(f"Raw response: {response.choices[0].message.content}")
+
+        # Parse the JSON content
+        return json.loads(content)
+
+    except json.JSONDecodeError as e:
+        print(f"JSON decoding error: {e}")
+        print(f"Raw response: {response.choices[0].message.content}")
+        return None
+    except Exception as e:
+        print(f"Error during conflict checking: {e}")
+        return None
+
+
 # Function to extract and analyze figure-related details  
-def extract_figures_and_text(conflict_results, ref_documents_texts):  
+def extract_figures_and_text(conflict_results, ref_documents_texts, domain, expertise, style):  
     """  
     Extract figures and related technical text from the 'check_for_conflicts' function's output.  
-    """
-    global domain_subject_matter, experience_expertise_qualifications, style_tone_voice  
+    """  
     # Extract the 'figures' and 'text' sections from the JSON output  
     fig_details = conflict_results.get("figures", [])  
     text_details = conflict_results.get("text", "")  
-  
+    content = f"""
+    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+
+    1. {domain}
+    2. Patent Law Proficiency: 
+    a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
+    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+
+    3. {expertise}
+    4. Capability to Propose Amendments:
+    a. Experienced in responding to examiners’ assertions or rejections of claims.
+    b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+    c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
+
+    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+
+    a. A thorough evaluation of the technical details and functionalities described in the patent application.
+    b. An assessment of the clarity and precision of the technical descriptions and diagrams.
+    c. An analysis of the novelty (under U.S.C 102) and non-obviousness (under U.S.C 103) of the subject matter by comparing it with similar existing documents.
+    d. Feedback on the strengths and potential areas for improvement in the document.
+    e. A determination of whether the invention meets the criteria for patentability under sections U.S.C 102 and U.S.C 103.
+    f. Proposals for suitable amendments to the claims in response to potential examiners’ assertions or rejections, ensuring the claims are robust and meet patentability standards.
+
+    Using this expertise, experience, and educational background, analyze the provided patent application document with a focus on its technical accuracy, clarity, adherence to patent application standards, novelty, non-obviousness, and overall feasibility.
+    """
+    # Print the content to the terminal
+    print("Generated Content for LLM:\n")
+    print(content)
+
     # Prepare a structured prompt for figure analysis  
     figure_analysis_prompt = f"""  
     Analyze the figures and technical text from the referenced document in relation to the foundational claim.  
@@ -268,7 +329,7 @@ def extract_figures_and_text(conflict_results, ref_documents_texts):
     messages = [  
         {  
             "role": "system",  
-            "content": f"You are a technical expert with expertise in {domain_subject_matter} analyzing figures in a document. Your experience and qualifications include {experience_expertise_qualifications}, and you approach this task with a {style_tone_voice} style."
+            "content": content,
         },  
         {  
             "role": "user",  
@@ -279,7 +340,7 @@ def extract_figures_and_text(conflict_results, ref_documents_texts):
     # Call OpenAI API for figure analysis  
     try:  
         response = client.chat.completions.create(  
-            model="GPT-4-Omni", messages=messages, temperature=0.6  
+            model="GPT-4-Omni", messages=messages, temperature=0.2  
         )  
         analysis_output = response.choices[0].message.content.strip()  
   
@@ -297,21 +358,50 @@ def extract_figures_and_text(conflict_results, ref_documents_texts):
   
     except json.JSONDecodeError as e:  
         print(f"JSON decoding error: {e}")  
-       
+        print(f"Raw response: {response.choices[0].message.content}")  
+        return None  
+    except Exception as e:  
+        print(f"Error during figure analysis: {e}")  
+        return None  
 
-# Function to extract details from the application as filed relating to the foundational claim  
-def extract_details_from_filed_application(filed_application_text, foundational_claim):  
+
+def extract_details_from_filed_application(filed_application_text, foundational_claim, domain, expertise, style):  
     """  
     Extract details from the filed application related to the foundational claim.  
+    """
+    content = f"""
+    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+
+    1. {domain}
+    2. Patent Law Proficiency: 
+    a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
+    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+
+    3. {expertise}
+    4. Capability to Propose Amendments:
+    a. Experienced in responding to examiners’ assertions or rejections of claims.
+    b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+    c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
+
+    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+
+    a. A thorough evaluation of the technical details and functionalities described in the patent application.
+    b. An assessment of the clarity and precision of the technical descriptions and diagrams.
+    c. An analysis of the novelty (under U.S.C 102) and non-obviousness (under U.S.C 103) of the subject matter by comparing it with similar existing documents.
+    d. Feedback on the strengths and potential areas for improvement in the document.
+    e. A determination of whether the invention meets the criteria for patentability under sections U.S.C 102 and U.S.C 103.
+    f. Proposals for suitable amendments to the claims in response to potential examiners’ assertions or rejections, ensuring the claims are robust and meet patentability standards.
+
+    Using this expertise, experience, and educational background, analyze the provided patent application document with a focus on its technical accuracy, clarity, adherence to patent application standards, novelty, non-obviousness, and overall feasibility.
     """  
-    global domain_subject_matter, experience_expertise_qualifications, style_tone_voice 
     prompt = f"""  
     Analyze the following filed application text and extract details related to the foundational claim.  
     Filed Application Text: {filed_application_text}  
     Foundational Claim: {json.dumps(foundational_claim, indent=2)}  
     Instructions:  
     1. Identify and extract all technical details from the filed application that relate to the foundational claim.  
-    2. Ensure that any extracted details include specific references to the paragraphs or sections in the filed application where they are found. NOTE:Extract in English.  
+    2. Ensure that any extracted details include specific references to the paragraphs or sections in the filed application where they are found. NOTE: Extract in English.  
     3. Return the extracted details in the following JSON format:  
     {{  
         "foundational_claim_details": [  
@@ -323,37 +413,37 @@ def extract_details_from_filed_application(filed_application_text, foundational_
         ]  
     }}  
     """  
-      
+  
     messages = [  
         {  
             "role": "system",  
-            "content": f"You are a technical expert with expertise in {domain_subject_matter} analyzing the filed application for details related to the foundational claim. Your experience and qualifications include {experience_expertise_qualifications}, and you approach this task with a {style_tone_voice} style"  
+            "content": content,
         },  
         {  
             "role": "user",  
             "content": prompt,  
         },  
     ]  
-      
+  
     # Call OpenAI API for extracting details from the filed application  
     try:  
         response = client.chat.completions.create(  
-            model="GPT-4-Omni", messages=messages, temperature=0.6  
+            model="GPT-4-Omni", messages=messages, temperature=0.2  
         )  
         analysis_output = response.choices[0].message.content.strip()  
-          
+  
         # Remove the triple backticks if they exist  
         if analysis_output.startswith("```json"):  
             analysis_output = analysis_output[7:-3].strip()  
         elif analysis_output.startswith("```"):  
             analysis_output = analysis_output[3:-3].strip()  
-          
+  
         # Print the raw response for debugging  
         print(f"Raw response: {response.choices[0].message.content}")  
-          
+  
         # Parse the JSON content  
         return json.loads(analysis_output)  
-      
+  
     except json.JSONDecodeError as e:  
         print(f"JSON decoding error: {e}")  
         print(f"Raw response: {response.choices[0].message.content}")  
@@ -361,12 +451,40 @@ def extract_details_from_filed_application(filed_application_text, foundational_
     except Exception as e:  
         print(f"Error extracting details from filed application: {e}")  
         return None  
+
   
 # Function to extract details from pending claims and modify the filed application details  
-def extract_and_modify_filed_application(filed_application_details, pending_claims_text):  
+def extract_and_modify_filed_application(filed_application_details, pending_claims_text, domain, expertise, style):  
     """  
     Extract details from the pending claims and modify the filed application details.  
     """
+    content = f"""
+    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+
+    1. {domain}
+    2. Patent Law Proficiency: 
+    a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
+    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+
+    3. {expertise}
+    4. Capability to Propose Amendments:
+    a. Experienced in responding to examiners’ assertions or rejections of claims.
+    b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+    c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
+
+    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+
+    a. A thorough evaluation of the technical details and functionalities described in the patent application.
+    b. An assessment of the clarity and precision of the technical descriptions and diagrams.
+    c. An analysis of the novelty (under U.S.C 102) and non-obviousness (under U.S.C 103) of the subject matter by comparing it with similar existing documents.
+    d. Feedback on the strengths and potential areas for improvement in the document.
+    e. A determination of whether the invention meets the criteria for patentability under sections U.S.C 102 and U.S.C 103.
+    f. Proposals for suitable amendments to the claims in response to potential examiners’ assertions or rejections, ensuring the claims are robust and meet patentability standards.
+
+    Using this expertise, experience, and educational background, analyze the provided patent application document with a focus on its technical accuracy, clarity, adherence to patent application standards, novelty, non-obviousness, and overall feasibility.
+    """  
+    
     global domain_subject_matter, experience_expertise_qualifications, style_tone_voice   
     prompt = f"""  
     Analyze the following pending claims text and modify the filed application details accordingly.  
@@ -391,7 +509,7 @@ def extract_and_modify_filed_application(filed_application_details, pending_clai
     messages = [  
         {  
             "role": "system",  
-            "content": f"You are a patent attorney with expertise in {domain_subject_matter} analyzing the pending claims to modify the filed application details. Your experience and qualifications include {experience_expertise_qualifications}, and you approach this task with a {style_tone_voice} style."
+            "content": content,
         },  
         {  
             "role": "user",  
@@ -402,7 +520,7 @@ def extract_and_modify_filed_application(filed_application_details, pending_clai
     # Call OpenAI API for extracting and modifying filed application details  
     try:  
         response = client.chat.completions.create(  
-            model="GPT-4-Omni", messages=messages, temperature=0.6  
+            model="GPT-4-Omni", messages=messages, temperature=0.2  
         )  
         analysis_output = response.choices[0].message.content.strip()  
           
@@ -427,8 +545,33 @@ def extract_and_modify_filed_application(filed_application_details, pending_clai
         return None  
   
 # Function to analyze the filed application based on the foundational claim, figure analysis, and application details  
-def analyze_filed_application(extracted_details, foundational_claim, figure_analysis): 
-    global domain_subject_matter, experience_expertise_qualifications, style_tone_voice  
+def analyze_filed_application(extracted_details, foundational_claim, figure_analysis, domain, expertise, style): 
+    content = f"""
+    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+
+    1. {domain}
+    2. Patent Law Proficiency: 
+    a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
+    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+
+    3. {expertise}
+    4. Capability to Propose Amendments:
+    a. Experienced in responding to examiners’ assertions or rejections of claims.
+    b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+    c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
+
+    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+
+    a. A thorough evaluation of the technical details and functionalities described in the patent application.
+    b. An assessment of the clarity and precision of the technical descriptions and diagrams.
+    c. An analysis of the novelty (under U.S.C 102) and non-obviousness (under U.S.C 103) of the subject matter by comparing it with similar existing documents.
+    d. Feedback on the strengths and potential areas for improvement in the document.
+    e. A determination of whether the invention meets the criteria for patentability under sections U.S.C 102 and U.S.C 103.
+    f. Proposals for suitable amendments to the claims in response to potential examiners’ assertions or rejections, ensuring the claims are robust and meet patentability standards.
+
+    Using this expertise, experience, and educational background, analyze the provided patent application document with a focus on its technical accuracy, clarity, adherence to patent application standards, novelty, non-obviousness, and overall feasibility.
+    """ 
     prompt = f"""  
     Analyze the filed application based on the foundational claim:  
     {json.dumps(foundational_claim, indent=2)}  
@@ -437,54 +580,76 @@ def analyze_filed_application(extracted_details, foundational_claim, figure_anal
     and the application as filed details:  
     {extracted_details}  
     Assess whether the examiner's rejection of the application under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified by comparing it with the cited references text.  
-Instructions:  
-Key Features of foundational claim  
-Extract the key features of the foundational claimKey Features of Cited Reference  
-Extract the key features of the cited reference  
-Examiner’s Analysis  
+    Instructions:  
+    Key Features of Foundational Claim:
+
+Extract and list the key features of the foundational claim.
+Ensure to include structural details, functional aspects, and any specific configurations mentioned in the claim.
+
+Key Features of Cited Reference:
+Extract and list the key features of the cited reference.(also include where it is located in the cited text)
+Highlight any similarities or differences in structure, function, and configuration compared to the foundational claim.
+
+Examiner’s Analysis:
 Describe the examiner’s analysis and the basis for rejection.
-Novelty Analysis  
-Conduct a novelty analysis comparing the foundational claim with the cited reference.Non-obviousness Analysis  
-Conduct a non-obviousness analysis comparing the foundational claim with the cited reference.Conclusion  
-Provide a conclusion on whether the examiner’s rejection under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified.Potential Areas for Distinction Listed  
-Identify potential areas for distinction in the foundational claim.
-Proposed Amendments and Arguments  
-Amendment to Foundational Claim for Each Key Feature Listed Separately with the New Features Highlighted:  
-  Amendment [Number]: [Feature]     
-  Original: "[Original feature description...]"     
-  Proposed: "[Enhanced feature description with new details, specific materials, or configurations...]"  
-  
-Proposed Argument to the Examiner:  
-Provide arguments for novelty and non-obviousness over the cited reference.Identify Limitations in the Current Claims  
-Identify limitations in the current claims and propose specific language or structural changes that address those limitations.Propose New Arguments or Amendments  
-Propose new arguments or amendments that distinguish the foundational claim from the cited prior art and strengthen the application. Ensure to include multiple amendments for thorough differentiation in depth.Maintain Original Intent  
-Note:Ensure the amendments maintain the original intent of the claims while improving clarity and scope.
-Note:Do the numbering in bullets and not in numbers. Do not give the markdown interface.
-Note: Wherever U.S.C 102 is mentioned, it should be printed as U.S.C 102 (Lack of Novelty), and wherever U.S.C 103 is mentioned, it should be printed as U.S.C 103 (Obviousness).  
+Summarize how the examiner interprets the cited reference in relation to the foundational claim.
+Identify whether the rejection is based on U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness).
+
+Novelty Analysis (U.S.C 102 - Lack of Novelty):
+Compare the foundational claim with the cited reference to determine if the claim lacks novelty.
+Identify if all elements of the foundational claim are disclosed in the cited reference.
+Provide a detailed side-by-side comparison of each element.
+
+Non-Obviousness Analysis (U.S.C 103 - Obviousness):
+Analyze whether the foundational claim is obvious in light of the cited reference.
+Consider if the combination of features in the foundational claim would have been obvious to a person skilled in the art at the time of the invention.
+Discuss any differences that might contribute to non-obviousness.
+
+Conclusion:
+Provide a conclusion on whether the examiner’s rejection under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified.
+Summarize the key points that support or refute the examiner’s rejection. 
+    Potential Areas for Distinction Listed  
+    Identify potential areas for distinction in the foundational claim.  
+    Proposed Amendments and Arguments  
+    Amendment to Foundational Claim for Each Key Feature Listed Separately with the New Features Highlighted:  
+        Amendment [Number]: [Feature]  
+        Original: "[Original feature description...]"  
+        Proposed: "[Enhanced feature description with new details, specific materials, or configurations...]"  
+ 
+        Provide arguments for novelty and non-obviousness over the cited reference.  
+    Identify Limitations in the Current Claims  
+    Identify limitations in the current claims and propose specific language or structural changes that address those limitations.  
+    Propose New Arguments or Amendments  
+    Propose new arguments or amendments that distinguish the foundational claim from the cited prior art and strengthen the application. Ensure to include multiple amendments for thorough differentiation in depth.  
+    NOTES:
+    Note: Ensure the amendments maintain the original intent of the claims while improving clarity and scope.  
+    Note: Do the numbering in bullets and not in numbers. Do not give the markdown interface.  
+    Note: Wherever U.S.C 102 is mentioned, it should be printed as U.S.C 102 (Lack of Novelty), and wherever U.S.C 103 is mentioned, it should be printed as U.S.C 103 (Obviousness).  
+    Note:Bolden the key points.
     """  
-      
+  
     messages = [  
         {  
             "role": "system",  
-            "content":f"You are a patent attorney with expertise in {domain_subject_matter} analyzing the claims to modify the filed application details. Your experience and qualifications include {experience_expertise_qualifications}, and you approach this task with a {style_tone_voice} style."
+            "content": content,
         },  
         {  
             "role": "user",  
             "content": prompt,  
         },  
     ]  
-      
+  
     try:  
         response = client.chat.completions.create(  
-            model="GPT-4-Omni", messages=messages, temperature=0.6  
+            model="GPT-4-Omni", messages=messages, temperature=0.2  
         )  
         analysis_output = response.choices[0].message.content.strip()  
-          
+  
         if analysis_output.startswith("```json"):  
             analysis_output = analysis_output[7:-3].strip()  
         elif analysis_output.startswith("```"):  
             analysis_output = analysis_output[3:-3].strip()  
-          
+  
         try:  
             return json.loads(analysis_output)  
         except json.JSONDecodeError:  
@@ -492,47 +657,101 @@ Note: Wherever U.S.C 102 is mentioned, it should be printed as U.S.C 102 (Lack o
     except Exception as e:  
         print(f"Error during filed application analysis: {e}")  
         return None  
+ 
   
-def analyze_modified_application(cited_references_text, foundational_claim, figure_analysis, modified_application_details):  
+def analyze_modified_application(cited_references_text, foundational_claim, figure_analysis, modified_application_details, domain, expertise, style): 
+    content = f"""
+    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+
+    1. {domain}
+    2. Patent Law Proficiency: 
+    a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
+    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+
+    3. {expertise}
+    4. Capability to Propose Amendments:
+    a. Experienced in responding to examiners’ assertions or rejections of claims.
+    b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
+    c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
+
+    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+
+    a. A thorough evaluation of the technical details and functionalities described in the patent application.
+    b. An assessment of the clarity and precision of the technical descriptions and diagrams.
+    c. An analysis of the novelty (under U.S.C 102) and non-obviousness (under U.S.C 103) of the subject matter by comparing it with similar existing documents.
+    d. Feedback on the strengths and potential areas for improvement in the document.
+    e. A determination of whether the invention meets the criteria for patentability under sections U.S.C 102 and U.S.C 103.
+    f. Proposals for suitable amendments to the claims in response to potential examiners’ assertions or rejections, ensuring the claims are robust and meet patentability standards.
+
+    Using this expertise, experience, and educational background, analyze the provided patent application document with a focus on its technical accuracy, clarity, adherence to patent application standards, novelty, non-obviousness, and overall feasibility.
+    """ 
     prompt = f"""  
     Analyze the modified application based on the foundational claim:{json.dumps(foundational_claim, indent=2)}and the figure analysis results:{json.dumps(figure_analysis, indent=2)}and the modified application details:{json.dumps(modified_application_details, indent=2)}and the cited references:{json.dumps(cited_references_text, indent=2)}  
-Assess whether the examiner's rejection of the application under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified by comparing it with the cited references text.  
-Instructions:  
-Key Features of Pending Claim  
-Extract the key features of the pending claimKey Features of Cited Reference  
-Extract the key features of the cited reference  
-Examiner’s Analysis  
+Assess whether the examiner's rejection of the application under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified by comparing it with the cited references text.
+
+Key Features of Foundational Claim:
+
+Extract and list the key features of the foundational claim.
+Ensure to include structural details, functional aspects, and any specific configurations mentioned in the claim.
+
+Key Features of Cited Reference:
+Extract and list the key features of the cited reference.(also include where it is located in the cited text)
+Highlight any similarities or differences in structure, function, and configuration compared to the foundational claim.
+
+Examiner’s Analysis:
 Describe the examiner’s analysis and the basis for rejection.
-Novelty Analysis  
-Conduct a novelty analysis comparing the pending claim with the cited reference.
-Non-obviousness Analysis  
-Conduct a non-obviousness Analysis comparing the pending claim with the cited reference.
-Conclusion  
-Provide a conclusion on whether the examiner’s rejection under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified.Potential Areas for Distinction Listed  
-Identify potential areas for distinction in the pending claim.Proposed Amendments and Arguments  
-Amendment to Foundational Claim for Each Key Feature Listed Separately with the New Features Highlighted:  
-  Amendment [Number]: [Feature]  
-  Original: "[Original feature description...]"  
-  Proposed: "[Enhanced feature description with new details, specific materials, or configurations...]"  
-  
-Proposed Argument to the Examiner:  
-Provide arguments for novelty and non-obviousness over the cited reference.Identify Limitations in the Current Claims  
-Identify limitations in the current claims and propose specific language or structural changes that address those limitations.Propose New Arguments or Amendments  
-Propose new arguments or amendments that distinguish the foundational claim from the cited prior art and strengthen the application. Ensure to include multiple amendments for thorough differentiation in depth.Maintain Original Intent  
-Note:Ensure the amendments maintain the original intent of the claims while improving clarity and scope.  
-Note:Do the numbering in bullets and not in numbers. Do not give the markdown interface.
-Note: Wherever U.S.C 102 is mentioned, it should be printed as U.S.C 102 (Lack of Novelty), and wherever U.S.C 103 is mentioned, it should be printed as U.S.C 103 (Obviousness).  
+Summarize how the examiner interprets the cited reference in relation to the foundational claim.
+Identify whether the rejection is based on U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness).
+
+Novelty Analysis (U.S.C 102 - Lack of Novelty):
+Compare the foundational claim with the cited reference to determine if the claim lacks novelty.
+Identify if all elements of the foundational claim are disclosed in the cited reference.
+Provide a detailed side-by-side comparison of each element.
+
+Non-Obviousness Analysis (U.S.C 103 - Obviousness):
+Analyze whether the foundational claim is obvious in light of the cited reference.
+Consider if the combination of features in the foundational claim would have been obvious to a person skilled in the art at the time of the invention.
+Discuss any differences that might contribute to non-obviousness.
+
+Conclusion:
+Provide a conclusion on whether the examiner’s rejection under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified.
+Summarize the key points that support or refute the examiner’s rejection.
+
+Potential Areas for Distinction:
+Identify areas where the foundational claim can be distinguished from the cited reference.
+Focus on unique structural features, specific materials, configurations, or functions not disclosed in the cited reference.
+
+Proposed Amendments and Arguments:
+For each key feature point in the foundational claim, propose specific amendments separately. NOTE: for all the points in the foundational claim, it is mandatory to propose amendments.
+Present original and proposed versions, highlighting new features, specific materials, or configurations.
+Amendment [Number]: [Feature]
+Original: "[Original feature description...]"
+Proposed: "[Enhanced feature description with new details, specific materials, or configurations...]"
+Provide arguments supporting novelty and non-obviousness over the cited reference.
+Emphasize any technical advantages or improvements introduced by the amendments.
+
+Identify Limitations in Current Claims:
+Identify any limitations or weaknesses in the current claims.
+Propose specific language or structural changes to address these limitations.
+Ensure that the proposed changes do not alter the original intent of the claims.
+
+Propose New Arguments or Amendments:
+Suggest additional arguments or amendments to further distinguish the foundational claim from the cited prior art.
+Include multiple amendments for thorough differentiation.
+Ensure that the original intent of the claims is maintained while improving clarity and scope.
+NOTE:
+Numbering and Formatting:
+Use bullet points (•) instead of numbers when listing items.
+Do not include markdown formatting in your response.
+Bolden the key points.
     """  
       
     messages = [  
         {  
             "role": "system",  
-            "content": (  
-                "Adopt the persona of a Person Having Ordinary Skill in the Art (PHOSITA). "  
-                "Analyze the modified application text and determine if the examiner is correct "  
-                "in rejecting the application under either U.S.C 102 or U.S.C 103. "  
-                "Cite instances from the modified application to justify your stance."  
-            )  
+            "content": content,
+
         },  
         {  
             "role": "user",  
@@ -622,6 +841,12 @@ if 'pending_claims_analysis' not in st.session_state:
     st.session_state.pending_claims_analysis = None  
 if 'pending_claims_available' not in st.session_state:  
     st.session_state.pending_claims_available = "No"  # Default to "No"  
+if 'domain' not in st.session_state:  
+    st.session_state.domain = None  
+if 'expertise' not in st.session_state:  
+    st.session_state.expertise = None  
+if 'style' not in st.session_state:  
+    st.session_state.style = None  
   
 # Function to create aligned uploader and button  
 def create_uploader_and_button(label_button, key):  
@@ -658,10 +883,16 @@ with st.expander("Step 1: Office Action", expanded=True):
             domain, expertise, style = determine_domain_expertise(extracted_examiner_text)  
   
             if domain and expertise and style:  
-                # Check for conflicts  
-                conflict_results_raw = check_for_conflicts(extracted_examiner_text)  
+                # Store domain expertise in session state  
+                st.session_state.domain = domain  
+                st.session_state.expertise = expertise  
+                st.session_state.style = style  
+  
+                # Check for conflicts, passing the domain, expertise, and style  
+                conflict_results_raw = check_for_conflicts(extracted_examiner_text, domain, expertise, style)  
   
                 if conflict_results_raw:  
+                    # Store results in session state  
                     st.session_state.conflict_results = conflict_results_raw  
                     st.session_state.foundational_claim = conflict_results_raw.get("foundational_claim", "")  
                     st.session_state.cited_documents = conflict_results_raw.get("documents_referenced", [])  
@@ -672,6 +903,7 @@ with st.expander("Step 1: Office Action", expanded=True):
                 st.error("Failed to determine domain expertise.")  
         else:  
             st.warning("Please upload the examiner document first.")  
+
   
 # Display Cited Documents Referenced after Step 1  
 if st.session_state.get("cited_documents") is not None:  
@@ -698,17 +930,18 @@ if st.session_state.get("conflict_results") is not None:  # Ensure Step 1 was co
                     ref_texts.append(extracted_ref_text)  
                     os.remove(f"temp_{uploaded_ref_file.name}")  
   
-                # Perform figure analysis on all referenced documents  
-                figure_analysis_results = extract_figures_and_text(st.session_state.conflict_results, ref_texts)  
+                # Perform figure analysis on all referenced documents, passing domain, expertise, and style  
+                figure_analysis_results = extract_figures_and_text(st.session_state.conflict_results, ref_texts, st.session_state.domain, st.session_state.expertise, st.session_state.style)  
   
                 if figure_analysis_results:  
+                    # Store results in session state  
                     st.session_state.figure_analysis = figure_analysis_results  
                     st.success("Figure analysis completed successfully!")  
                 else:  
                     st.error("Failed to analyze figures and cited text.")  
             else:  
                 st.warning("Please upload the referenced documents first.")  
-  
+
 # Step 3: Upload Filed Application and Analyze  
 if st.session_state.get("figure_analysis") is not None:  
     with st.expander("Step 3: Application as Filed", expanded=True):  
@@ -722,22 +955,30 @@ if st.session_state.get("figure_analysis") is not None:
                 extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
                 os.remove("temp_filed.pdf")  
   
-                # Perform filed application analysis  
+                # Perform filed application analysis, passing domain, expertise, and style  
                 filed_app_details = extract_details_from_filed_application(  
                     extracted_filed_app_text,  
-                    st.session_state.foundational_claim  
+                    st.session_state.foundational_claim,  
+                    st.session_state.domain,  
+                    st.session_state.expertise,  
+                    st.session_state.style  
                 )  
                 if filed_app_details:  
                     filed_app_details_json = json.dumps(filed_app_details, indent=2)  
+                    # Store results in session state  
                     st.session_state.filed_application_analysis = filed_app_details_json  
   
-                    # Perform filed application analysis and generate report  
+                    # Perform filed application analysis and generate report, passing domain, expertise, and style  
                     analysis_results = analyze_filed_application(  
                         filed_app_details_json,  
                         st.session_state.foundational_claim,  
-                        st.session_state.figure_analysis  
+                        st.session_state.figure_analysis,  
+                        st.session_state.domain,  
+                        st.session_state.expertise,  
+                        st.session_state.style  
                     )  
                     if analysis_results:  
+                        # Store results in session state  
                         st.session_state.filed_application_analysis = analysis_results  
                         st.success("Filed application analysis completed successfully!")  
                         docx_buffer = save_analysis_to_word(analysis_results)  
@@ -755,7 +996,7 @@ if st.session_state.get("figure_analysis") is not None:
                     st.error("Failed to analyze the filed application.")  
             else:  
                 st.warning("Please upload the filed application first.")  
-  
+
 # Step 4: Pending Claims  
 if st.session_state.get("filed_application_analysis") is not None:  
     with st.expander("Step 4: Pending Claims", expanded=True):  
@@ -773,32 +1014,53 @@ if st.session_state.get("filed_application_analysis") is not None:
                     extracted_pending_claims_text = extract_text_from_pdf("temp_pending_claims.pdf")  
                     os.remove("temp_pending_claims.pdf")  
   
-                    # Perform pending claims analysis  
-                    pending_claims_analysis_results = analyze_modified_application(  
+                    # Call extract_and_modify_filed_application first  
+                    modified_filed_application_results = extract_and_modify_filed_application(  
+                        st.session_state.filed_application_analysis,  
                         extracted_pending_claims_text,  
-                        st.session_state.foundational_claim,  
-                        st.session_state.figure_analysis,  
-                        st.session_state.filed_application_analysis  
+                        st.session_state.domain,  
+                        st.session_state.expertise,  
+                        st.session_state.style  
                     )  
-                    if pending_claims_analysis_results:  
-                        st.session_state.pending_claims_analysis = pending_claims_analysis_results  
-                        st.success("Pending claims analysis completed successfully!")  
-                        st.json(pending_claims_analysis_results)  
+                    if modified_filed_application_results:  
+                        # Store modified results in session state  
+                        st.session_state.modified_filed_application_results = modified_filed_application_results  
+                        st.success("Modified filed application analysis completed successfully!")  
+                        st.json(modified_filed_application_results)  
   
-                        # Generate report for download  
-                        docx_buffer = save_analysis_to_word(pending_claims_analysis_results)  
-                        if docx_buffer:  
-                            st.download_button(  
-                                label="Download Analysis Results",  
-                                data=docx_buffer,  
-                                file_name="pending_claims_analysis.docx",  
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
-                                key="pending_claims_download"  
-                            )  
+                        # Perform pending claims analysis  
+                        pending_claims_analysis_results = analyze_modified_application(  
+                            extracted_pending_claims_text,  
+                            st.session_state.foundational_claim,  
+                            st.session_state.figure_analysis,  
+                            modified_filed_application_results,
+                            st.session_state.domain,  
+                            st.session_state.expertise,  
+                            st.session_state.style   
+                        )  
+                        if pending_claims_analysis_results:  
+                            # Store results in session state  
+                            st.session_state.pending_claims_analysis = pending_claims_analysis_results  
+                            st.success("Pending claims analysis completed successfully!")  
+                            st.json(pending_claims_analysis_results)  
+  
+                            # Generate report for download  
+                            docx_buffer = save_analysis_to_word(pending_claims_analysis_results)  
+                            if docx_buffer:  
+                                st.download_button(  
+                                    label="Download Analysis Results",  
+                                    data=docx_buffer,  
+                                    file_name="pending_claims_analysis.docx",  
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
+                                    key="pending_claims_download"  
+                                )  
+                        else:  
+                            st.error("Failed to analyze the pending claims.")  
                     else:  
-                        st.error("Failed to analyze the pending claims.")  
+                        st.error("Failed to modify the filed application based on pending claims.")  
                 else:  
                     st.warning("Please upload the pending claims document first.")  
+
   
 # Option to download results if there are no pending claims  
 if st.session_state.get("filed_application_analysis") and st.session_state.pending_claims_analysis is None:  
