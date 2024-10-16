@@ -1066,7 +1066,11 @@ if st.session_state.get("figure_analysis") is not None:
 if st.session_state.get("filed_application_analysis") is not None:  
     with st.expander("Step 4: Pending Claims", expanded=True):  
         st.write("### Do you have a Pending Claims Document to Analyze?")  
-        st.session_state.pending_claims_available = st.radio("Select an option:", ("Yes", "No"), index=0 if st.session_state.pending_claims_available == "Yes" else 1)  
+        st.session_state.pending_claims_available = st.radio(  
+            "Select an option:",   
+            ("Yes", "No"),   
+            index=0 if st.session_state.pending_claims_available == "Yes" else 1  
+        )  
   
         if st.session_state.pending_claims_available == "Yes":  
             st.write("### Upload the Pending Claims Document and Analyze")  
@@ -1092,8 +1096,7 @@ if st.session_state.get("filed_application_analysis") is not None:
                             # Store modified results in session state  
                             st.session_state.modified_filed_application_results = modified_filed_application_results  
                             st.success("Modified filed application analysis completed successfully!")  
-                            st.json(modified_filed_application_results)  
-  
+                              
                             # Perform pending claims analysis  
                             pending_claims_analysis_results = analyze_modified_application(  
                                 extracted_pending_claims_text,  
@@ -1108,7 +1111,6 @@ if st.session_state.get("filed_application_analysis") is not None:
                                 # Store results in session state  
                                 st.session_state.pending_claims_analysis = pending_claims_analysis_results  
                                 st.success("Pending claims analysis completed successfully!")  
-                                st.json(pending_claims_analysis_results)  
   
                                 # Generate report for download  
                                 docx_buffer = save_analysis_to_word(pending_claims_analysis_results)  
@@ -1129,7 +1131,6 @@ if st.session_state.get("filed_application_analysis") is not None:
                         st.error("Failed to extract text from the pending claims document.")  
                 else:  
                     st.warning("Please upload the pending claims document first.")  
-  
 # Option to download results if there are no pending claims  
 if st.session_state.get("filed_application_analysis") and st.session_state.pending_claims_analysis is None:  
     docx_buffer = save_analysis_to_word(st.session_state.filed_application_analysis)  
