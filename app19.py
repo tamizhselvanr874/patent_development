@@ -12,8 +12,7 @@ from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.credentials import AzureKeyCredential  
 from azure.core.exceptions import HttpResponseError  
 from docx2pdf import convert  
-import pythoncom
-  
+
 # Load environment variables from .env file  
 load_dotenv()  
 # Initialize global variables  
@@ -853,14 +852,11 @@ def create_uploader_and_button(label_button, key):
 def convert_docx_to_pdf(docx_path, pdf_path):  
     """Convert a DOCX file to PDF using docx2pdf."""  
     try:  
-        pythoncom.CoInitialize()  # Initialize COM library  
         convert(docx_path, pdf_path)  
         return pdf_path  
     except Exception as e:  
         st.error(f"Failed to convert DOCX to PDF: {e}")  
         return None  
-    finally:  
-        pythoncom.CoUninitialize()  # Uninitialize COM library  
   
 def extract_text_from_pdf(uploaded_pdf_path):  
     """Extract text from a PDF file using Azure Form Recognizer Document Intelligence."""  
