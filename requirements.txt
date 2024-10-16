@@ -9,4 +9,3 @@ azure-core
 docx2pdf
 regex
 jsonschema
-pywin32
