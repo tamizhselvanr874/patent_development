@@ -1,8 +1,11 @@
 PyMuPDF
 openai
 python-dotenv
-regex
+pandas
 streamlit
 python-docx
 azure-ai-formrecognizer
 azure-core
+docx2pdf
+regex
+jsonschema
