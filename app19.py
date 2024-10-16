@@ -10,6 +10,9 @@ import docx
 from io import BytesIO  
 from azure.ai.formrecognizer import DocumentAnalysisClient  
 from azure.core.credentials import AzureKeyCredential  
+from azure.core.exceptions import HttpResponseError  
+from docx2pdf import convert  
+import pythoncom
   
 # Load environment variables from .env file  
 load_dotenv()  
@@ -28,38 +31,6 @@ client = AzureOpenAI(
 # Azure Form Recognizer setup  
 form_recognizer_endpoint = os.getenv("FORM_RECOGNIZER_ENDPOINT")  
 form_recognizer_api_key = os.getenv("FORM_RECOGNIZER_API_KEY")  
-  
-  
-def extract_text_from_pdf(uploaded_pdf, use_ocr=False):  
-    """Extract text from a PDF file, optionally using OCR."""  
-    if use_ocr:  
-        document_analysis_client = DocumentAnalysisClient(  
-            endpoint=form_recognizer_endpoint,  
-            credential=AzureKeyCredential(form_recognizer_api_key),  
-        )  
-        poller = document_analysis_client.begin_analyze_document(  
-            "prebuilt-document", document=uploaded_pdf  
-        )  
-        result = poller.result()  
-        text = ""  
-        for page in result.pages:  
-            for line in page.lines:  
-                text += line.content + "\n"  
-        return text  
-    else:  
-        # If the input is a file-like object, read it. Otherwise, assume it's a path.  
-        if hasattr(uploaded_pdf, 'read'):  
-            pdf_content = uploaded_pdf.read()  
-        else:  
-            with open(uploaded_pdf, 'rb') as f:  
-                pdf_content = f.read()  
-  
-        document = fitz.open(stream=pdf_content, filetype="pdf")  
-        text = ""  
-        for page_num in range(len(document)):  
-            page = document.load_page(page_num)  
-            text += page.get_text()  
-        return text  
   
   
 def extract_text_from_docx(uploaded_docx):  
@@ -92,7 +63,7 @@ def determine_domain_expertise(action_document_text):
     messages = [  
         {  
             "role": "system",  
-            "content": "You are an AI assistant that helps people find information."  
+            "content": "You are an AI assistant that can analyze the following action document text and determine the domain, expertise, and subject matter required to analyze this document."  
         },  
         {  
             "role": "user",  
@@ -158,12 +129,12 @@ def check_for_conflicts(action_document_text, domain, expertise, style):
 
     # The content with placeholders dynamically filled
     content = f"""
-    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to the mentioned domain. Your expertise includes:
 
     1. {domain}
     2. Patent Law Proficiency: 
     a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
-    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    b. Knowledgeable about the structure and requirements of patent applications.
     c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
 
     3. {expertise}
@@ -172,7 +143,7 @@ def check_for_conflicts(action_document_text, domain, expertise, style):
     b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
     c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
 
-    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+    Adopt a {style} suitable for analyzing patent applications in the given domain and subject matter. Your analysis should include:
 
     a. A thorough evaluation of the technical details and functionalities described in the patent application.
     b. An assessment of the clarity and precision of the technical descriptions and diagrams.
@@ -256,12 +227,12 @@ def extract_figures_and_text(conflict_results, ref_documents_texts, domain, expe
     fig_details = conflict_results.get("figures", [])  
     text_details = conflict_results.get("text", "")  
     content = f"""
-    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to the mentioned domain. Your expertise includes:
 
     1. {domain}
     2. Patent Law Proficiency: 
     a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
-    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    b. Knowledgeable about the structure and requirements of patent applications.
     c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
 
     3. {expertise}
@@ -270,7 +241,7 @@ def extract_figures_and_text(conflict_results, ref_documents_texts, domain, expe
     b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
     c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
 
-    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+    Adopt a {style} suitable for analyzing patent applications in the given domain and subject matter. Your analysis should include:
 
     a. A thorough evaluation of the technical details and functionalities described in the patent application.
     b. An assessment of the clarity and precision of the technical descriptions and diagrams.
@@ -370,12 +341,12 @@ def extract_details_from_filed_application(filed_application_text, foundational_
     Extract details from the filed application related to the foundational claim.  
     """
     content = f"""
-    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+   You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to the mentioned domain. Your expertise includes:
 
     1. {domain}
     2. Patent Law Proficiency: 
     a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
-    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    b. Knowledgeable about the structure and requirements of patent applications.
     c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
 
     3. {expertise}
@@ -384,7 +355,7 @@ def extract_details_from_filed_application(filed_application_text, foundational_
     b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
     c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
 
-    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+    Adopt a {style} suitable for analyzing patent applications in the given domain and subject matter. Your analysis should include:
 
     a. A thorough evaluation of the technical details and functionalities described in the patent application.
     b. An assessment of the clarity and precision of the technical descriptions and diagrams.
@@ -459,12 +430,12 @@ def extract_and_modify_filed_application(filed_application_details, pending_clai
     Extract details from the pending claims and modify the filed application details.  
     """
     content = f"""
-    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to the mentioned domain. Your expertise includes:
 
     1. {domain}
     2. Patent Law Proficiency: 
     a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
-    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    b. Knowledgeable about the structure and requirements of patent applications.
     c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
 
     3. {expertise}
@@ -473,7 +444,7 @@ def extract_and_modify_filed_application(filed_application_details, pending_clai
     b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
     c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
 
-    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+    Adopt a {style} suitable for analyzing patent applications in the given domain and subject matter. Your analysis should include:
 
     a. A thorough evaluation of the technical details and functionalities described in the patent application.
     b. An assessment of the clarity and precision of the technical descriptions and diagrams.
@@ -547,12 +518,12 @@ def extract_and_modify_filed_application(filed_application_details, pending_clai
 # Function to analyze the filed application based on the foundational claim, figure analysis, and application details  
 def analyze_filed_application(extracted_details, foundational_claim, figure_analysis, domain, expertise, style): 
     content = f"""
-    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+   You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to the mentioned domain. Your expertise includes:
 
     1. {domain}
     2. Patent Law Proficiency: 
     a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
-    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    b. Knowledgeable about the structure and requirements of patent applications.
     c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
 
     3. {expertise}
@@ -561,7 +532,7 @@ def analyze_filed_application(extracted_details, foundational_claim, figure_anal
     b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
     c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
 
-    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+    Adopt a {style} suitable for analyzing patent applications in the given domain and subject matter. Your analysis should include:
 
     a. A thorough evaluation of the technical details and functionalities described in the patent application.
     b. An assessment of the clarity and precision of the technical descriptions and diagrams.
@@ -675,12 +646,12 @@ Be Persuasive: Articulate the advantages and unique aspects of the invention tha
   
 def analyze_modified_application(cited_references_text, foundational_claim, figure_analysis, modified_application_details, domain, expertise, style): 
     content = f"""
-    You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to {domain}. Your expertise includes:
+   You are now assuming the role of a deeply specialized expert in {domain} as well as a comprehensive understanding of patent law specific to the mentioned domain. Your expertise includes:
 
     1. {domain}
     2. Patent Law Proficiency: 
     a. Skilled in interpreting and evaluating patent claims, classifications, and legal terminologies.
-    b. Knowledgeable about the structure and requirements of patent applications, particularly within the {domain} sector.
+    b. Knowledgeable about the structure and requirements of patent applications.
     c. Expertise in comparing similar documents for patent claims under sections U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
 
     3. {expertise}
@@ -689,7 +660,7 @@ def analyze_modified_application(cited_references_text, foundational_claim, figu
     b. Skilled in proposing suitable amendments to patent claims to address rejections under U.S.C 102 (novelty) and U.S.C 103 (non-obviousness).
     c. Proficient in articulating and justifying amendments to ensure compliance with patentability requirements.
 
-    Adopt a {style} suitable for analyzing patent applications in the {domain} industry. Your analysis should include:
+    Adopt a {style} suitable for analyzing patent applications in the given domain and subject matter. Your analysis should include:
 
     a. A thorough evaluation of the technical details and functionalities described in the patent application.
     b. An assessment of the clarity and precision of the technical descriptions and diagrams.
@@ -851,45 +822,86 @@ def save_analysis_to_word(analysis_output):
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    
-    return buffer 
-# Initialize session state variables  
+    return buffer
 
-if 'conflict_results' not in st.session_state:  
-    st.session_state.conflict_results = None  
-if 'foundational_claim' not in st.session_state:  
-    st.session_state.foundational_claim = None  
-if 'figure_analysis' not in st.session_state:  
-    st.session_state.figure_analysis = None  
-if 'filed_application_analysis' not in st.session_state:  
-    st.session_state.filed_application_analysis = None  
-if 'cited_documents' not in st.session_state:  
-    st.session_state.cited_documents = None  
-if 'pending_claims_analysis' not in st.session_state:  
-    st.session_state.pending_claims_analysis = None  
-if 'pending_claims_available' not in st.session_state:  
-    st.session_state.pending_claims_available = "No"  # Default to "No"  
-if 'domain' not in st.session_state:  
-    st.session_state.domain = None  
-if 'expertise' not in st.session_state:  
-    st.session_state.expertise = None  
-if 'style' not in st.session_state:  
-    st.session_state.style = None  
-if 'filed_application_name' not in st.session_state:  
-    st.session_state.filed_application_name = None  # Initialize filed_application_name  
+# Define your endpoint and key  
+form_recognizer_endpoint = "https://patentocr.cognitiveservices.azure.com/"  # Replace with your actual endpoint  
+form_recognizer_api_key = "cd6b8996d93447be88d995729c924bcb"
+# Initialize session state variables  
+session_vars = [  
+    'conflict_results', 'foundational_claim', 'figure_analysis', 'filed_application_analysis',  
+    'cited_documents', 'pending_claims_analysis', 'pending_claims_available', 'domain', 'expertise',  
+    'style', 'filed_application_name'  
+]  
+  
+for var in session_vars:  
+    if var not in st.session_state:  
+        st.session_state[var] = None  
+  
+st.session_state['pending_claims_available'] = st.session_state.get('pending_claims_available', "No")  
   
 # Function to create aligned uploader and button  
 def create_uploader_and_button(label_button, key):  
     col1, col2 = st.columns([4, 1])  # Adjust the column widths as needed  
     with col1:  
-        uploaded_file = st.file_uploader("", type="pdf", key=key)  # Empty string for no label  
+        uploaded_file = st.file_uploader("", type=["pdf", "docx"], key=key)  # Empty string for no label  
     with col2:  
         st.markdown("<br>", unsafe_allow_html=True)  # Add some space with HTML  
         button_clicked = st.button(label_button)  
     return uploaded_file, button_clicked  
+  
+def convert_docx_to_pdf(docx_path, pdf_path):  
+    """Convert a DOCX file to PDF using docx2pdf."""  
+    try:  
+        pythoncom.CoInitialize()  # Initialize COM library  
+        convert(docx_path, pdf_path)  
+        return pdf_path  
+    except Exception as e:  
+        st.error(f"Failed to convert DOCX to PDF: {e}")  
+        return None  
+    finally:  
+        pythoncom.CoUninitialize()  # Uninitialize COM library  
+  
+def extract_text_from_pdf(uploaded_pdf_path):  
+    """Extract text from a PDF file using Azure Form Recognizer Document Intelligence."""  
+    try:  
+        # Initialize DocumentAnalysisClient  
+        document_analysis_client = DocumentAnalysisClient(  
+            endpoint=form_recognizer_endpoint,  
+            credential=AzureKeyCredential(form_recognizer_api_key),  
+        )  
+  
+        # Read the file content  
+        with open(uploaded_pdf_path, "rb") as f:  
+            file_content = f.read()  
+  
+        # Use the prebuilt-document model to analyze the document  
+        poller = document_analysis_client.begin_analyze_document(  
+            "prebuilt-document", document=file_content  
+        )  
+  
+        # Get the result of the analysis  
+        result = poller.result()  
+  
+        # Extract the text from the result  
+        text = ""  
+        for page in result.pages:  
+            for line in page.lines:  
+                text += line.content + "\n"  
+  
+        return text  
+  
+    except HttpResponseError as e:  
+        st.error(f"Failed to analyze the document: {e.message}")  
+        return None  
+  
+    except Exception as e:  
+        st.error(f"An unexpected error occurred: {e}")  
+        return None  
+  
 # Display the logo and title  
 st.image("AFS Innovation Logo.png", width=200)  # Adjust the width as needed  
-st.title("Patent Analyser") 
+st.title("Patent Analyser")  
   
 # Step 1: Upload Examiner Document and Check Conflicts  
 with st.expander("Step 1: Office Action", expanded=True):  
@@ -903,37 +915,52 @@ with st.expander("Step 1: Office Action", expanded=True):
             with open(temp_file_path, "wb") as f:  
                 f.write(uploaded_examiner_file.read())  
   
-            # Extract text from the uploaded file  
-            if uploaded_examiner_file.type == "application/pdf":  
-                extracted_examiner_text = extract_text_from_pdf(temp_file_path)  
-            elif uploaded_examiner_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":  
-                extracted_examiner_text = extract_text_from_docx(temp_file_path)  
-  
-            # Remove the temporary file  
-            os.remove(temp_file_path)  
-  
-            # Determine domain expertise  
-            domain, expertise, style = determine_domain_expertise(extracted_examiner_text)  
-  
-            if domain and expertise and style:  
-                # Store domain expertise in session state  
-                st.session_state.domain = domain  
-                st.session_state.expertise = expertise  
-                st.session_state.style = style  
-  
-                # Check for conflicts, passing the domain, expertise, and style  
-                conflict_results_raw = check_for_conflicts(extracted_examiner_text, domain, expertise, style)  
-  
-                if conflict_results_raw:  
-                    # Store results in session state  
-                    st.session_state.conflict_results = conflict_results_raw  
-                    st.session_state.foundational_claim = conflict_results_raw.get("foundational_claim", "")  
-                    st.session_state.cited_documents = conflict_results_raw.get("documents_referenced", [])  
-                    st.success("Conflicts checked successfully!")  
+            if uploaded_examiner_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":  
+                # Convert DOCX to PDF  
+                temp_pdf_path = "temp_examiner_converted.pdf"  
+                pdf_path = convert_docx_to_pdf(temp_file_path, temp_pdf_path)  
+                if pdf_path:  
+                    temp_file_path = pdf_path  
                 else:  
-                    st.error("Failed to check for conflicts.")  
+                    st.error("Failed to convert DOCX to PDF.")  
+  
+            if os.path.exists(temp_file_path):  
+                # Extract text from the uploaded file  
+                extracted_examiner_text = extract_text_from_pdf(temp_file_path)  
+  
+                if extracted_examiner_text:  
+                    # Determine domain expertise  
+                    domain, expertise, style = determine_domain_expertise(extracted_examiner_text)  
+  
+                    if domain and expertise and style:  
+                        # Store domain expertise in session state  
+                        st.session_state.domain = domain  
+                        st.session_state.expertise = expertise  
+                        st.session_state.style = style  
+  
+                        # Check for conflicts, passing the domain, expertise, and style  
+                        conflict_results_raw = check_for_conflicts(extracted_examiner_text, domain, expertise, style)  
+  
+                        if conflict_results_raw:  
+                            # Store results in session state  
+                            st.session_state.conflict_results = conflict_results_raw  
+                            st.session_state.foundational_claim = conflict_results_raw.get("foundational_claim", "")  
+                            st.session_state.cited_documents = conflict_results_raw.get("documents_referenced", [])  
+                            st.success("Conflicts checked successfully!")  
+                        else:  
+                            st.error("Failed to check for conflicts.")  
+                    else:  
+                        st.error("Failed to determine domain expertise.")  
+                else:  
+                    st.error("Failed to extract text from the examiner document.")  
+  
+                # Remove the temporary files  
+                os.remove(temp_file_path)  
+                if uploaded_examiner_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":  
+                    if os.path.exists(temp_pdf_path):  
+                        os.remove(temp_pdf_path)  
             else:  
-                st.error("Failed to determine domain expertise.")  
+                st.error("Failed to process the uploaded file.")  
         else:  
             st.warning("Please upload the examiner document first.")  
   
@@ -963,7 +990,10 @@ if st.session_state.get("conflict_results") is not None:  # Ensure Step 1 was co
                     os.remove(f"temp_{uploaded_ref_file.name}")  
   
                 # Perform figure analysis on all referenced documents, passing domain, expertise, and style  
-                figure_analysis_results = extract_figures_and_text(st.session_state.conflict_results, ref_texts, st.session_state.domain, st.session_state.expertise, st.session_state.style)  
+                figure_analysis_results = extract_figures_and_text(  
+                    st.session_state.conflict_results, ref_texts,  
+                    st.session_state.domain, st.session_state.expertise, st.session_state.style  
+                )  
   
                 if figure_analysis_results:  
                     # Store results in session state  
@@ -987,49 +1017,52 @@ if st.session_state.get("figure_analysis") is not None:
                 extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
                 os.remove("temp_filed.pdf")  
   
-                # Extract the filed application name from the uploaded file (this is a placeholder; implement as needed)  
-                st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  # Replace with actual logic to extract name  
+                if extracted_filed_app_text:  
+                    # Extract the filed application name from the uploaded file (this is a placeholder; implement as needed)  
+                    st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  # Replace with actual logic to extract name  
   
-                # Perform filed application analysis, passing domain, expertise, and style  
-                filed_app_details = extract_details_from_filed_application(  
-                    extracted_filed_app_text,  
-                    st.session_state.foundational_claim,  
-                    st.session_state.domain,  
-                    st.session_state.expertise,  
-                    st.session_state.style  
-                )  
-                if filed_app_details:  
-                    filed_app_details_json = json.dumps(filed_app_details, indent=2)  
-                    # Store results in session state  
-                    st.session_state.filed_application_analysis = filed_app_details_json  
-  
-                    # Perform filed application analysis and generate report, passing domain, expertise, and style  
-                    analysis_results = analyze_filed_application(  
-                        filed_app_details_json,  
+                    # Perform filed application analysis, passing domain, expertise, and style  
+                    filed_app_details = extract_details_from_filed_application(  
+                        extracted_filed_app_text,  
                         st.session_state.foundational_claim,  
-                        st.session_state.figure_analysis,  
                         st.session_state.domain,  
                         st.session_state.expertise,  
                         st.session_state.style  
                     )  
-                    if analysis_results:  
+                    if filed_app_details:  
+                        filed_app_details_json = json.dumps(filed_app_details, indent=2)  
                         # Store results in session state  
-                        st.session_state.filed_application_analysis = analysis_results  
-                        st.success("Filed application analysis completed successfully!")  
-                        docx_buffer = save_analysis_to_word(analysis_results)  
-                        if docx_buffer:  
-                            filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
-                            st.download_button(  
-                                label="Download Analysis Results",  
-                                data=docx_buffer,  
-                                file_name=f"{filed_application_name}_ANALYSIS.docx",  
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
-                                key="filed_application_download"  
-                            )  
+                        st.session_state.filed_application_analysis = filed_app_details_json  
+  
+                        # Perform filed application analysis and generate report, passing domain, expertise, and style  
+                        analysis_results = analyze_filed_application(  
+                            filed_app_details_json,  
+                            st.session_state.foundational_claim,  
+                            st.session_state.figure_analysis,  
+                            st.session_state.domain,  
+                            st.session_state.expertise,  
+                            st.session_state.style  
+                        )  
+                        if analysis_results:  
+                            # Store results in session state  
+                            st.session_state.filed_application_analysis = analysis_results  
+                            st.success("Filed application analysis completed successfully!")  
+                            docx_buffer = save_analysis_to_word(analysis_results)  
+                            if docx_buffer:  
+                                filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
+                                st.download_button(  
+                                    label="Download Analysis Results",  
+                                    data=docx_buffer,  
+                                    file_name=f"{filed_application_name}_ANALYSIS.docx",  
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
+                                    key="filed_application_download"  
+                                )  
+                        else:  
+                            st.error("Failed to analyze the filed application.")  
                     else:  
                         st.error("Failed to analyze the filed application.")  
                 else:  
-                    st.error("Failed to analyze the filed application.")  
+                    st.error("Failed to extract text from the filed application document.")  
             else:  
                 st.warning("Please upload the filed application first.")  
   
@@ -1050,51 +1083,54 @@ if st.session_state.get("filed_application_analysis") is not None:
                     extracted_pending_claims_text = extract_text_from_pdf("temp_pending_claims.pdf")  
                     os.remove("temp_pending_claims.pdf")  
   
-                    # Call extract_and_modify_filed_application first  
-                    modified_filed_application_results = extract_and_modify_filed_application(  
-                        st.session_state.filed_application_analysis,  
-                        extracted_pending_claims_text,  
-                        st.session_state.domain,  
-                        st.session_state.expertise,  
-                        st.session_state.style  
-                    )  
-                    if modified_filed_application_results:  
-                        # Store modified results in session state  
-                        st.session_state.modified_filed_application_results = modified_filed_application_results  
-                        st.success("Modified filed application analysis completed successfully!")  
-                        st.json(modified_filed_application_results)  
-  
-                        # Perform pending claims analysis  
-                        pending_claims_analysis_results = analyze_modified_application(  
+                    if extracted_pending_claims_text:  
+                        # Call extract_and_modify_filed_application first  
+                        modified_filed_application_results = extract_and_modify_filed_application(  
+                            st.session_state.filed_application_analysis,  
                             extracted_pending_claims_text,  
-                            st.session_state.foundational_claim,  
-                            st.session_state.figure_analysis,  
-                            modified_filed_application_results,  
                             st.session_state.domain,  
                             st.session_state.expertise,  
                             st.session_state.style  
                         )  
-                        if pending_claims_analysis_results:  
-                            # Store results in session state  
-                            st.session_state.pending_claims_analysis = pending_claims_analysis_results  
-                            st.success("Pending claims analysis completed successfully!")  
-                            st.json(pending_claims_analysis_results)  
+                        if modified_filed_application_results:  
+                            # Store modified results in session state  
+                            st.session_state.modified_filed_application_results = modified_filed_application_results  
+                            st.success("Modified filed application analysis completed successfully!")  
+                            st.json(modified_filed_application_results)  
   
-                            # Generate report for download  
-                            docx_buffer = save_analysis_to_word(pending_claims_analysis_results)  
-                            if docx_buffer:  
-                                filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
-                                st.download_button(  
-                                    label="Download Analysis Results",  
-                                    data=docx_buffer,  
-                                    file_name=f"{filed_application_name}_ANALYSIS.docx",  
-                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
-                                    key="pending_claims_download"  
-                                )  
+                            # Perform pending claims analysis  
+                            pending_claims_analysis_results = analyze_modified_application(  
+                                extracted_pending_claims_text,  
+                                st.session_state.foundational_claim,  
+                                st.session_state.figure_analysis,  
+                                modified_filed_application_results,  
+                                st.session_state.domain,  
+                                st.session_state.expertise,  
+                                st.session_state.style  
+                            )  
+                            if pending_claims_analysis_results:  
+                                # Store results in session state  
+                                st.session_state.pending_claims_analysis = pending_claims_analysis_results  
+                                st.success("Pending claims analysis completed successfully!")  
+                                st.json(pending_claims_analysis_results)  
+  
+                                # Generate report for download  
+                                docx_buffer = save_analysis_to_word(pending_claims_analysis_results)  
+                                if docx_buffer:  
+                                    filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
+                                    st.download_button(  
+                                        label="Download Analysis Results",  
+                                        data=docx_buffer,  
+                                        file_name=f"{filed_application_name}_ANALYSIS.docx",  
+                                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
+                                        key="pending_claims_download"  
+                                    )  
+                            else:  
+                                st.error("Failed to analyze the pending claims.")  
                         else:  
-                            st.error("Failed to analyze the pending claims.")  
+                            st.error("Failed to modify the filed application based on pending claims.")  
                     else:  
-                        st.error("Failed to modify the filed application based on pending claims.")  
+                        st.error("Failed to extract text from the pending claims document.")  
                 else:  
                     st.warning("Please upload the pending claims document first.")  
   
