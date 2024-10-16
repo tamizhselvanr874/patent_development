@@ -609,23 +609,37 @@ Conclusion:
 Provide a conclusion on whether the examiner’s rejection under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified.
 Summarize the key points that support or refute the examiner’s rejection. 
     Potential Areas for Distinction Listed  
-    Identify potential areas for distinction in the foundational claim.  
+    Identify potential areas for distinction in the foundational claim. 
+    INSTRUCTIONS TO BE FOLLOWED WHILE PROPOSING AMENDMENTS:
+Guidance for Proposing Amendments and Arguments:
+When proposing amendments:
+
+Be Specific: Clearly identify which feature you are amending and provide detailed enhancements.
+Highlight Novel Elements: Emphasize new details such as specific materials, unique configurations, or innovative steps that are not present in the cited reference.
+Refer to Sources: Cite sections of the application or figures from which the amendments and supporting arguments are drawn to reinforce their basis.
+Maintain Claim Integrity: Ensure that the proposed amendments do not alter the fundamental essence of the original claim but enhance its patentability.
+When crafting arguments to the examiner:
+Address Rejection Points: Directly counter the examiner's reasons for rejection by highlighting differences between the amended claim and the cited reference.
+Emphasize Novelty and Non-Obviousness: Explain why the amended features are new and not obvious, providing clear distinctions from the prior art.
+Use Supporting Evidence: Reference specific examples, embodiments, or descriptions in the application that support your arguments.
+Be Persuasive: Articulate the advantages and unique aspects of the invention that merit patent protection.
     Proposed Amendments and Arguments  
     Amendment to Foundational Claim for Each Key Feature Listed Separately with the New Features Highlighted:  
         Amendment [Number]: [Feature]  
         Original: "[Original feature description...]"  
         Proposed: "[Enhanced feature description with new details, specific materials, or configurations...]"  
+
  
         Provide arguments for novelty and non-obviousness over the cited reference.  
     Identify Limitations in the Current Claims  
     Identify limitations in the current claims and propose specific language or structural changes that address those limitations.  
     Propose New Arguments or Amendments  
-    Propose new arguments or amendments that distinguish the foundational claim from the cited prior art and strengthen the application. Ensure to include multiple amendments for thorough differentiation in depth.  
-    NOTES:
-    Note: Ensure the amendments maintain the original intent of the claims while improving clarity and scope.  
-    Note: Do the numbering in bullets and not in numbers. Do not give the markdown interface.  
-    Note: Wherever U.S.C 102 is mentioned, it should be printed as U.S.C 102 (Lack of Novelty), and wherever U.S.C 103 is mentioned, it should be printed as U.S.C 103 (Obviousness).  
-    Note:Bolden the key points.
+    Suggest additional arguments or amendments that further distinguish the foundational claim from the prior art and strengthen the application. Include multiple amendments for thorough differentiation.
+    FORMATTING NOTES:
+     - Ensure the amendments maintain the original intent of the claims while improving clarity and scope.  
+      - Do the numbering in bullets and not in numbers. Do not use markdown formatting in your response.  
+      -Wherever U.S.C 102 is mentioned, it should be printed as U.S.C 102 (Lack of Novelty), and wherever U.S.C 103 is mentioned, it should be printed as U.S.C 103 (Obviousness).  
+     - Bold the key points.
     """  
   
     messages = [  
@@ -730,6 +744,19 @@ Original: "[Original feature description...]"
 Proposed: "[Enhanced feature description with new details, specific materials, or configurations...]"
 Provide arguments supporting novelty and non-obviousness over the cited reference.
 Emphasize any technical advantages or improvements introduced by the amendments.
+NOTE WHILE PROPOSING ARGUMENTS:
+'''\Guidance for Proposing Amendments and Arguments:
+When proposing amendments:
+
+Be Specific: Clearly identify which feature you are amending and provide detailed enhancements.
+Highlight Novel Elements: Emphasize new details such as specific materials, unique configurations, or innovative steps that are not present in the cited reference.
+Refer to Sources: Cite sections of the application or figures from which the amendments and supporting arguments are drawn to reinforce their basis.
+Maintain Claim Integrity: Ensure that the proposed amendments do not alter the fundamental essence of the original claim but enhance its patentability.
+When crafting arguments to the examiner:
+Address Rejection Points: Directly counter the examiner's reasons for rejection by highlighting differences between the amended claim and the cited reference.
+Emphasize Novelty and Non-Obviousness: Explain why the amended features are new and not obvious, providing clear distinctions from the prior art.
+Use Supporting Evidence: Reference specific examples, embodiments, or descriptions in the application that support your arguments.
+Be Persuasive: Articulate the advantages and unique aspects of the invention that merit patent protection.\'''
 
 Identify Limitations in Current Claims:
 Identify any limitations or weaknesses in the current claims.
@@ -827,6 +854,7 @@ def save_analysis_to_word(analysis_output):
     
     return buffer 
 # Initialize session state variables  
+
 if 'conflict_results' not in st.session_state:  
     st.session_state.conflict_results = None  
 if 'foundational_claim' not in st.session_state:  
@@ -847,6 +875,8 @@ if 'expertise' not in st.session_state:
     st.session_state.expertise = None  
 if 'style' not in st.session_state:  
     st.session_state.style = None  
+if 'filed_application_name' not in st.session_state:  
+    st.session_state.filed_application_name = None  # Initialize filed_application_name  
   
 # Function to create aligned uploader and button  
 def create_uploader_and_button(label_button, key):  
@@ -857,6 +887,9 @@ def create_uploader_and_button(label_button, key):
         st.markdown("<br>", unsafe_allow_html=True)  # Add some space with HTML  
         button_clicked = st.button(label_button)  
     return uploaded_file, button_clicked  
+# Display the logo and title  
+st.image("AFS Innovation Logo.png", width=200)  # Adjust the width as needed  
+st.title("Patent Analyser") 
   
 # Step 1: Upload Examiner Document and Check Conflicts  
 with st.expander("Step 1: Office Action", expanded=True):  
@@ -903,7 +936,6 @@ with st.expander("Step 1: Office Action", expanded=True):
                 st.error("Failed to determine domain expertise.")  
         else:  
             st.warning("Please upload the examiner document first.")  
-
   
 # Display Cited Documents Referenced after Step 1  
 if st.session_state.get("cited_documents") is not None:  
@@ -941,7 +973,7 @@ if st.session_state.get("conflict_results") is not None:  # Ensure Step 1 was co
                     st.error("Failed to analyze figures and cited text.")  
             else:  
                 st.warning("Please upload the referenced documents first.")  
-
+  
 # Step 3: Upload Filed Application and Analyze  
 if st.session_state.get("figure_analysis") is not None:  
     with st.expander("Step 3: Application as Filed", expanded=True):  
@@ -954,6 +986,9 @@ if st.session_state.get("figure_analysis") is not None:
                     f.write(uploaded_filed_app.read())  
                 extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
                 os.remove("temp_filed.pdf")  
+  
+                # Extract the filed application name from the uploaded file (this is a placeholder; implement as needed)  
+                st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  # Replace with actual logic to extract name  
   
                 # Perform filed application analysis, passing domain, expertise, and style  
                 filed_app_details = extract_details_from_filed_application(  
@@ -983,10 +1018,11 @@ if st.session_state.get("figure_analysis") is not None:
                         st.success("Filed application analysis completed successfully!")  
                         docx_buffer = save_analysis_to_word(analysis_results)  
                         if docx_buffer:  
+                            filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
                             st.download_button(  
                                 label="Download Analysis Results",  
                                 data=docx_buffer,  
-                                file_name="filed_application_analysis.docx",  
+                                file_name=f"{filed_application_name}_ANALYSIS.docx",  
                                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
                                 key="filed_application_download"  
                             )  
@@ -996,7 +1032,7 @@ if st.session_state.get("figure_analysis") is not None:
                     st.error("Failed to analyze the filed application.")  
             else:  
                 st.warning("Please upload the filed application first.")  
-
+  
 # Step 4: Pending Claims  
 if st.session_state.get("filed_application_analysis") is not None:  
     with st.expander("Step 4: Pending Claims", expanded=True):  
@@ -1033,10 +1069,10 @@ if st.session_state.get("filed_application_analysis") is not None:
                             extracted_pending_claims_text,  
                             st.session_state.foundational_claim,  
                             st.session_state.figure_analysis,  
-                            modified_filed_application_results,
+                            modified_filed_application_results,  
                             st.session_state.domain,  
                             st.session_state.expertise,  
-                            st.session_state.style   
+                            st.session_state.style  
                         )  
                         if pending_claims_analysis_results:  
                             # Store results in session state  
@@ -1047,10 +1083,11 @@ if st.session_state.get("filed_application_analysis") is not None:
                             # Generate report for download  
                             docx_buffer = save_analysis_to_word(pending_claims_analysis_results)  
                             if docx_buffer:  
+                                filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
                                 st.download_button(  
                                     label="Download Analysis Results",  
                                     data=docx_buffer,  
-                                    file_name="pending_claims_analysis.docx",  
+                                    file_name=f"{filed_application_name}_ANALYSIS.docx",  
                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
                                     key="pending_claims_download"  
                                 )  
@@ -1060,16 +1097,16 @@ if st.session_state.get("filed_application_analysis") is not None:
                         st.error("Failed to modify the filed application based on pending claims.")  
                 else:  
                     st.warning("Please upload the pending claims document first.")  
-
   
 # Option to download results if there are no pending claims  
 if st.session_state.get("filed_application_analysis") and st.session_state.pending_claims_analysis is None:  
     docx_buffer = save_analysis_to_word(st.session_state.filed_application_analysis)  
     if docx_buffer:  
+        filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
         st.download_button(  
             label="Download Analysis Results",  
             data=docx_buffer,  
-            file_name="filed_application_analysis.docx",  
+            file_name=f"{filed_application_name}_ANALYSIS.docx",  
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
             key="filed_application_final_download"  
         )  
