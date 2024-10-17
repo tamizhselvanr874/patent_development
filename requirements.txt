@@ -9,5 +9,5 @@ azure-core
 docx2pdf
 regex
 jsonschema
-pypandoc
+pypandoc==1.14  
 PyPDF2
