@@ -1050,74 +1050,77 @@ if st.session_state.get("figure_analysis") is not None:
                         pdf_path = os.path.join(tmpdirname, pdf_file.name)  
                           
                         with open(word_path, "wb") as f:  
-                            f.write(word_file.getbuffer())  
+                            f.write(word_file.read())  
                         with open(pdf_path, "wb") as f:  
-                            f.write(pdf_file.getbuffer())  
-                          
-                        output_pdf_file = os.path.join(tmpdirname, "combined_document.pdf")  
+                            f.write(pdf_file.read())  
                           
                         with st.spinner("Converting Word to PDF..."):  
-                            converted_pdf = convert_word_to_pdf(word_path, os.path.join(tmpdirname, "converted.pdf"))  
+                            converted_pdf_path = os.path.join(tmpdirname, "converted.pdf")  
+                            convert_success = convert_word_to_pdf(word_path, converted_pdf_path)  
                           
-                        if converted_pdf:  
+                        if convert_success:  
                             with st.spinner("Merging PDFs..."):  
-                                merged_pdf = merge_pdfs([converted_pdf, pdf_path], output_pdf_file)  
+                                output_pdf_file = os.path.join(tmpdirname, "combined_document.pdf")  
+                                merge_success = merge_pdfs([converted_pdf_path, pdf_path], output_pdf_file)  
                               
-                            st.success("DOCX and PDF have been successfully combined!")  
-                            with open(output_pdf_file, "rb") as f:  
-                                st.download_button(  
-                                    label="Download Combined PDF",  
-                                    data=f,  
-                                    file_name="combined_document.pdf",  
-                                    mime="application/pdf"  
-                                )  
-                              
-                            # Proceed with Step 3 as the combined PDF is ready  
-                            with open("temp_filed.pdf", "wb") as f:  
-                                f.write(f.read())  
-                            extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
-                            os.remove("temp_filed.pdf")  
-                              
-                            if extracted_filed_app_text:  
-                                st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  
-                                filed_app_details = extract_details_from_filed_application(  
-                                    extracted_filed_app_text,  
-                                    st.session_state.foundational_claim,  
-                                    st.session_state.domain,  
-                                    st.session_state.expertise,  
-                                    st.session_state.style  
-                                )  
-                                if filed_app_details:  
-                                    filed_app_details_json = json.dumps(filed_app_details, indent=2)  
-                                    st.session_state.filed_application_analysis = filed_app_details_json  
-                                      
-                                    analysis_results = analyze_filed_application(  
-                                        filed_app_details_json,  
+                            if merge_success:  
+                                st.success("DOCX and PDF have been successfully combined!")  
+                                with open(output_pdf_file, "rb") as f:  
+                                    st.download_button(  
+                                        label="Download Combined PDF",  
+                                        data=f,  
+                                        file_name="combined_document.pdf",  
+                                        mime="application/pdf"  
+                                    )  
+                                  
+                                # Proceed with Step 3 as the combined PDF is ready  
+                                with open("temp_filed.pdf", "wb") as f:  
+                                    f.write(f.read())  
+                                extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
+                                os.remove("temp_filed.pdf")  
+                                  
+                                if extracted_filed_app_text:  
+                                    st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  
+                                    filed_app_details = extract_details_from_filed_application(  
+                                        extracted_filed_app_text,  
                                         st.session_state.foundational_claim,  
-                                        st.session_state.figure_analysis,  
                                         st.session_state.domain,  
                                         st.session_state.expertise,  
                                         st.session_state.style  
                                     )  
-                                    if analysis_results:  
-                                        st.session_state.filed_application_analysis = analysis_results  
-                                        st.success("Filed application analysis completed successfully!")  
-                                        docx_buffer = save_analysis_to_word(analysis_results)  
-                                        if docx_buffer:  
-                                            filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
-                                            st.download_button(  
-                                                label="Download Analysis Results",  
-                                                data=docx_buffer,  
-                                                file_name=f"{filed_application_name}_ANALYSIS.docx",  
-                                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
-                                                key="filed_application_download"  
-                                            )  
+                                    if filed_app_details:  
+                                        filed_app_details_json = json.dumps(filed_app_details, indent=2)  
+                                        st.session_state.filed_application_analysis = filed_app_details_json  
+                                          
+                                        analysis_results = analyze_filed_application(  
+                                            filed_app_details_json,  
+                                            st.session_state.foundational_claim,  
+                                            st.session_state.figure_analysis,  
+                                            st.session_state.domain,  
+                                            st.session_state.expertise,  
+                                            st.session_state.style  
+                                        )  
+                                        if analysis_results:  
+                                            st.session_state.filed_application_analysis = analysis_results  
+                                            st.success("Filed application analysis completed successfully!")  
+                                            docx_buffer = save_analysis_to_word(analysis_results)  
+                                            if docx_buffer:  
+                                                filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
+                                                st.download_button(  
+                                                    label="Download Analysis Results",  
+                                                    data=docx_buffer,  
+                                                    file_name=f"{filed_application_name}_ANALYSIS.docx",  
+                                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
+                                                    key="filed_application_download"  
+                                                )  
+                                        else:  
+                                            st.error("Failed to analyze the filed application.")  
                                     else:  
                                         st.error("Failed to analyze the filed application.")  
                                 else:  
-                                    st.error("Failed to analyze the filed application.")  
+                                    st.error("Failed to extract text from the filed application document.")  
                             else:  
-                                st.error("Failed to extract text from the filed application document.")  
+                                st.error("Failed to merge PDFs.")  
                         else:  
                             st.error("Failed to convert Word to PDF.")  
                 else:  
