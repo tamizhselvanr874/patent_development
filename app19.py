@@ -1196,16 +1196,21 @@ if st.session_state.get("filed_application_analysis") is not None:
   
         if st.session_state.pending_claims_available == "Yes":  
             st.write("### Upload the Pending Claims Document and Analyze")  
-            uploaded_pending_claims_file = st.file_uploader("Upload Pending Claims Document", type=["pdf"], key="pending_claims_uploader")  
+            uploaded_pending_claims_file = st.file_uploader("Upload Pending Claims Document", type=["pdf", "docx"], key="pending_claims_uploader")  
             analyze_pending_claims_clicked = st.button("Analyze Pending Claims", key="analyze_pending_claims_button")  
   
             if analyze_pending_claims_clicked:  
                 if uploaded_pending_claims_file is not None:  
-                    temp_pdf_path = "temp_pending_claims.pdf"  
-                    with open(temp_pdf_path, "wb") as f:  
+                    temp_claims_path = "temp_pending_claims" + (".pdf" if uploaded_pending_claims_file.type == "application/pdf" else ".docx")  
+                    with open(temp_claims_path, "wb") as f:  
                         f.write(uploaded_pending_claims_file.read())  
-                    extracted_pending_claims_text = extract_text_from_pdf(temp_pdf_path)  
-                    os.remove(temp_pdf_path)  
+                      
+                    if temp_claims_path.endswith(".pdf"):  
+                        extracted_pending_claims_text = extract_text_from_pdf(temp_claims_path)  
+                    else:  
+                        extracted_pending_claims_text = extract_text_from_docx(temp_claims_path)  
+                      
+                    os.remove(temp_claims_path)  
   
                     if extracted_pending_claims_text:  
                         modified_filed_application_results = extract_and_modify_filed_application(  
