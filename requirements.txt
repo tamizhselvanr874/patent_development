@@ -9,3 +9,5 @@ azure-core
 docx2pdf
 regex
 jsonschema
+pypandoc
+PyPDF2
