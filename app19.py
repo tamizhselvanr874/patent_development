@@ -1074,10 +1074,12 @@ if st.session_state.get("figure_analysis") is not None:
                                     )  
                                   
                                 # Proceed with Step 3 as the combined PDF is ready  
-                                with open("temp_filed.pdf", "wb") as f:  
-                                    f.write(f.read())  
-                                extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
-                                os.remove("temp_filed.pdf")  
+                                temp_pdf_path = "temp_filed.pdf"  
+                                with open(temp_pdf_path, "wb") as f:  
+                                    f.write(open(output_pdf_file, "rb").read())  
+                                  
+                                extracted_filed_app_text = extract_text_from_pdf(temp_pdf_path)  
+                                os.remove(temp_pdf_path)  
                                   
                                 if extracted_filed_app_text:  
                                     st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  
@@ -1132,10 +1134,11 @@ if st.session_state.get("figure_analysis") is not None:
               
             if analyze_filed_app_clicked:  
                 if uploaded_filed_app is not None:  
-                    with open("temp_filed.pdf", "wb") as f:  
+                    temp_pdf_path = "temp_filed.pdf"  
+                    with open(temp_pdf_path, "wb") as f:  
                         f.write(uploaded_filed_app.read())  
-                    extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
-                    os.remove("temp_filed.pdf")  
+                    extracted_filed_app_text = extract_text_from_pdf(temp_pdf_path)  
+                    os.remove(temp_pdf_path)  
                       
                     if extracted_filed_app_text:  
                         st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  
@@ -1196,10 +1199,11 @@ if st.session_state.get("filed_application_analysis") is not None:
               
             if analyze_pending_claims_clicked:  
                 if uploaded_pending_claims_file is not None:  
-                    with open("temp_pending_claims.pdf", "wb") as f:  
+                    temp_pdf_path = "temp_pending_claims.pdf"  
+                    with open(temp_pdf_path, "wb") as f:  
                         f.write(uploaded_pending_claims_file.read())  
-                    extracted_pending_claims_text = extract_text_from_pdf("temp_pending_claims.pdf")  
-                    os.remove("temp_pending_claims.pdf")  
+                    extracted_pending_claims_text = extract_text_from_pdf(temp_pdf_path)  
+                    os.remove(temp_pdf_path)  
                       
                     if extracted_pending_claims_text:  
                         modified_filed_application_results = extract_and_modify_filed_application(  
