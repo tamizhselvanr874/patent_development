@@ -12,6 +12,10 @@ from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.credentials import AzureKeyCredential  
 from azure.core.exceptions import HttpResponseError  
 from docx2pdf import convert  
+import pypandoc  
+from PyPDF2 import PdfMerger  
+import os  
+import tempfile 
 
 # Load environment variables from .env file  
 load_dotenv()  
@@ -838,7 +842,7 @@ for var in session_vars:
         st.session_state[var] = None  
   
 st.session_state['pending_claims_available'] = st.session_state.get('pending_claims_available', "No")  
-  
+
 # Function to create aligned uploader and button  
 def create_uploader_and_button(label_button, key):  
     col1, col2 = st.columns([4, 1])  # Adjust the column widths as needed  
@@ -895,24 +899,65 @@ def extract_text_from_pdf(uploaded_pdf_path):
         st.error(f"An unexpected error occurred: {e}")  
         return None  
   
+# Function to convert DOCX to PDF  
+def convert_word_to_pdf(input_file, output_file):  
+    try:  
+        pypandoc.convert_file(input_file, 'pdf', outputfile=output_file, extra_args=['--pdf-engine=pdflatex'])  
+        return output_file  
+    except Exception as e:  
+        st.error(f"Error converting file: {e}")  
+        return None  
+  
+# Function to merge multiple PDFs  
+def merge_pdfs(pdf_list, output_file):  
+    merger = PdfMerger()  
+    for pdf in pdf_list:  
+        merger.append(pdf)  
+    merger.write(output_file)  
+    merger.close()  
+    return output_file  
+  
+# Ensure session state is initialized  
+if 'conflict_results' not in st.session_state:  
+    st.session_state.conflict_results = None  
+if 'foundational_claim' not in st.session_state:  
+    st.session_state.foundational_claim = None  
+if 'figure_analysis' not in st.session_state:  
+    st.session_state.figure_analysis = None  
+if 'filed_application_analysis' not in st.session_state:  
+    st.session_state.filed_application_analysis = None  
+if 'cited_documents' not in st.session_state:  
+    st.session_state.cited_documents = None  
+if 'pending_claims_analysis' not in st.session_state:  
+    st.session_state.pending_claims_analysis = None  
+if 'pending_claims_available' not in st.session_state:  
+    st.session_state.pending_claims_available = "No"  
+if 'domain' not in st.session_state:  
+    st.session_state.domain = None  
+if 'expertise' not in st.session_state:  
+    st.session_state.expertise = None  
+if 'style' not in st.session_state:  
+    st.session_state.style = None  
+if 'filed_application_name' not in st.session_state:  
+    st.session_state.filed_application_name = None  
+  
 # Display the logo and title  
-st.image("AFS Innovation Logo.png", width=200)  # Adjust the width as needed  
-st.title("Patent Analyser")  
+st.image("AFS Innovation Logo.png", width=200)  
+st.title("Patent Analyzer")  
   
 # Step 1: Upload Examiner Document and Check Conflicts  
 with st.expander("Step 1: Office Action", expanded=True):  
     st.write("### Upload the Examiner Document and Check for Conflicts")  
-    uploaded_examiner_file, conflicts_clicked = create_uploader_and_button("Check for Conflicts", "examiner")  
+    uploaded_examiner_file = st.file_uploader("Upload Examiner Document", type=["pdf", "docx"])  
+    conflicts_clicked = st.button("Check for Conflicts")  
   
     if conflicts_clicked:  
         if uploaded_examiner_file is not None:  
-            # Save the uploaded file temporarily  
             temp_file_path = "temp_examiner.pdf" if uploaded_examiner_file.type == "application/pdf" else "temp_examiner.docx"  
             with open(temp_file_path, "wb") as f:  
                 f.write(uploaded_examiner_file.read())  
   
             if uploaded_examiner_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":  
-                # Convert DOCX to PDF  
                 temp_pdf_path = "temp_examiner_converted.pdf"  
                 pdf_path = convert_docx_to_pdf(temp_file_path, temp_pdf_path)  
                 if pdf_path:  
@@ -921,24 +966,16 @@ with st.expander("Step 1: Office Action", expanded=True):
                     st.error("Failed to convert DOCX to PDF.")  
   
             if os.path.exists(temp_file_path):  
-                # Extract text from the uploaded file  
                 extracted_examiner_text = extract_text_from_pdf(temp_file_path)  
-  
                 if extracted_examiner_text:  
-                    # Determine domain expertise  
                     domain, expertise, style = determine_domain_expertise(extracted_examiner_text)  
-  
                     if domain and expertise and style:  
-                        # Store domain expertise in session state  
                         st.session_state.domain = domain  
                         st.session_state.expertise = expertise  
                         st.session_state.style = style  
   
-                        # Check for conflicts, passing the domain, expertise, and style  
                         conflict_results_raw = check_for_conflicts(extracted_examiner_text, domain, expertise, style)  
-  
                         if conflict_results_raw:  
-                            # Store results in session state  
                             st.session_state.conflict_results = conflict_results_raw  
                             st.session_state.foundational_claim = conflict_results_raw.get("foundational_claim", "")  
                             st.session_state.cited_documents = conflict_results_raw.get("documents_referenced", [])  
@@ -949,8 +986,6 @@ with st.expander("Step 1: Office Action", expanded=True):
                         st.error("Failed to determine domain expertise.")  
                 else:  
                     st.error("Failed to extract text from the examiner document.")  
-  
-                # Remove the temporary files  
                 os.remove(temp_file_path)  
                 if uploaded_examiner_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":  
                     if os.path.exists(temp_pdf_path):  
@@ -967,11 +1002,9 @@ if st.session_state.get("cited_documents") is not None:
     st.table(cited_docs_df)  
   
 # Step 2: Upload Referenced Document and Analyze Figures  
-if st.session_state.get("conflict_results") is not None:  # Ensure Step 1 was completed  
+if st.session_state.get("conflict_results") is not None:  
     with st.expander("Step 2: Referenced Documents", expanded=True):  
         st.write("### Upload the Referenced Documents and Analyze Figures")  
-  
-        # Allow multiple file uploads  
         uploaded_ref_files = st.file_uploader("", type="pdf", key="referenced", accept_multiple_files=True)  
         analyze_figures_clicked = st.button("Analyze Figures and Cited Text")  
   
@@ -985,14 +1018,12 @@ if st.session_state.get("conflict_results") is not None:  # Ensure Step 1 was co
                     ref_texts.append(extracted_ref_text)  
                     os.remove(f"temp_{uploaded_ref_file.name}")  
   
-                # Perform figure analysis on all referenced documents, passing domain, expertise, and style  
                 figure_analysis_results = extract_figures_and_text(  
                     st.session_state.conflict_results, ref_texts,  
                     st.session_state.domain, st.session_state.expertise, st.session_state.style  
                 )  
   
                 if figure_analysis_results:  
-                    # Store results in session state  
                     st.session_state.figure_analysis = figure_analysis_results  
                     st.success("Figure analysis completed successfully!")  
                 else:  
@@ -1000,81 +1031,165 @@ if st.session_state.get("conflict_results") is not None:  # Ensure Step 1 was co
             else:  
                 st.warning("Please upload the referenced documents first.")  
   
-# Step 3: Upload Filed Application and Analyze  
+# Step 3: Ask if the Application is Published  
 if st.session_state.get("figure_analysis") is not None:  
     with st.expander("Step 3: Application as Filed", expanded=True):  
-        st.write("### Upload the Filed Application and Analyze")  
-        uploaded_filed_app, analyze_filed_app_clicked = create_uploader_and_button("Analyze Filed Application", "filed")  
+        st.write("### Is the Application Published?")  
+        is_published = st.radio("Select an option:", ("Yes", "No"))  
   
-        if analyze_filed_app_clicked:  
-            if uploaded_filed_app is not None:  
-                with open("temp_filed.pdf", "wb") as f:  
-                    f.write(uploaded_filed_app.read())  
-                extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
-                os.remove("temp_filed.pdf")  
+        if is_published == "No":  
+            st.write("### Upload the DOCX and PDF to Combine and Analyze")  
+            word_file = st.file_uploader("Upload Word document", type=["docx"])  
+            pdf_file = st.file_uploader("Upload PDF document", type=["pdf"])  
+            combine_and_proceed_clicked = st.button("Combine and Proceed")  
   
-                if extracted_filed_app_text:  
-                    # Extract the filed application name from the uploaded file (this is a placeholder; implement as needed)  
-                    st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  # Replace with actual logic to extract name  
+            if combine_and_proceed_clicked:  
+                if word_file and pdf_file:  
+                    with tempfile.TemporaryDirectory() as tmpdirname:  
+                        word_path = os.path.join(tmpdirname, word_file.name)  
+                        pdf_path = os.path.join(tmpdirname, pdf_file.name)  
   
-                    # Perform filed application analysis, passing domain, expertise, and style  
-                    filed_app_details = extract_details_from_filed_application(  
-                        extracted_filed_app_text,  
-                        st.session_state.foundational_claim,  
-                        st.session_state.domain,  
-                        st.session_state.expertise,  
-                        st.session_state.style  
-                    )  
-                    if filed_app_details:  
-                        filed_app_details_json = json.dumps(filed_app_details, indent=2)  
-                        # Store results in session state  
-                        st.session_state.filed_application_analysis = filed_app_details_json  
+                        with open(word_path, "wb") as f:  
+                            f.write(word_file.getbuffer())  
+                        with open(pdf_path, "wb") as f:  
+                            f.write(pdf_file.getbuffer())  
   
-                        # Perform filed application analysis and generate report, passing domain, expertise, and style  
-                        analysis_results = analyze_filed_application(  
-                            filed_app_details_json,  
+                        output_pdf_file = os.path.join(tmpdirname, "combined_document.pdf")  
+  
+                        with st.spinner("Converting Word to PDF..."):  
+                            converted_pdf = convert_word_to_pdf(word_path, os.path.join(tmpdirname, "converted.pdf"))  
+  
+                        if converted_pdf:  
+                            with st.spinner("Merging PDFs..."):  
+                                merged_pdf = merge_pdfs([converted_pdf, pdf_path], output_pdf_file)  
+  
+                            st.success("DOCX and PDF have been successfully combined!")  
+                            with open(output_pdf_file, "rb") as f:  
+                                st.download_button(  
+                                    label="Download Combined PDF",  
+                                    data=f,  
+                                    file_name="combined_document.pdf",  
+                                    mime="application/pdf"  
+                                )  
+  
+                            # Proceed with Step 3 as the combined PDF is ready  
+                            with open("temp_filed.pdf", "wb") as f:  
+                                f.write(f.read())  
+                            extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
+                            os.remove("temp_filed.pdf")  
+  
+                            if extracted_filed_app_text:  
+                                st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  
+                                filed_app_details = extract_details_from_filed_application(  
+                                    extracted_filed_app_text,  
+                                    st.session_state.foundational_claim,  
+                                    st.session_state.domain,  
+                                    st.session_state.expertise,  
+                                    st.session_state.style  
+                                )  
+                                if filed_app_details:  
+                                    filed_app_details_json = json.dumps(filed_app_details, indent=2)  
+                                    st.session_state.filed_application_analysis = filed_app_details_json  
+  
+                                    analysis_results = analyze_filed_application(  
+                                        filed_app_details_json,  
+                                        st.session_state.foundational_claim,  
+                                        st.session_state.figure_analysis,  
+                                        st.session_state.domain,  
+                                        st.session_state.expertise,  
+                                        st.session_state.style  
+                                    )  
+                                    if analysis_results:  
+                                        st.session_state.filed_application_analysis = analysis_results  
+                                        st.success("Filed application analysis completed successfully!")  
+                                        docx_buffer = save_analysis_to_word(analysis_results)  
+                                        if docx_buffer:  
+                                            filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
+                                            st.download_button(  
+                                                label="Download Analysis Results",  
+                                                data=docx_buffer,  
+                                                file_name=f"{filed_application_name}_ANALYSIS.docx",  
+                                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
+                                                key="filed_application_download"  
+                                            )  
+                                    else:  
+                                        st.error("Failed to analyze the filed application.")  
+                                else:  
+                                    st.error("Failed to analyze the filed application.")  
+                            else:  
+                                st.error("Failed to extract text from the filed application document.")  
+                        else:  
+                            st.error("Failed to convert Word to PDF.")  
+                else:  
+                    st.warning("Please upload both the DOCX and PDF files.")  
+  
+        elif is_published == "Yes":  
+            uploaded_filed_app = st.file_uploader("Upload Filed Application", type=["pdf"])  
+            analyze_filed_app_clicked = st.button("Analyze Filed Application")  
+  
+            if analyze_filed_app_clicked:  
+                if uploaded_filed_app is not None:  
+                    with open("temp_filed.pdf", "wb") as f:  
+                        f.write(uploaded_filed_app.read())  
+                    extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
+                    os.remove("temp_filed.pdf")  
+  
+                    if extracted_filed_app_text:  
+                        st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  
+                        filed_app_details = extract_details_from_filed_application(  
+                            extracted_filed_app_text,  
                             st.session_state.foundational_claim,  
-                            st.session_state.figure_analysis,  
                             st.session_state.domain,  
                             st.session_state.expertise,  
                             st.session_state.style  
                         )  
-                        if analysis_results:  
-                            # Store results in session state  
-                            st.session_state.filed_application_analysis = analysis_results  
-                            st.success("Filed application analysis completed successfully!")  
-                            docx_buffer = save_analysis_to_word(analysis_results)  
-                            if docx_buffer:  
-                                filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
-                                st.download_button(  
-                                    label="Download Analysis Results",  
-                                    data=docx_buffer,  
-                                    file_name=f"{filed_application_name}_ANALYSIS.docx",  
-                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
-                                    key="filed_application_download"  
-                                )  
+                        if filed_app_details:  
+                            filed_app_details_json = json.dumps(filed_app_details, indent=2)  
+                            st.session_state.filed_application_analysis = filed_app_details_json  
+  
+                            analysis_results = analyze_filed_application(  
+                                filed_app_details_json,  
+                                st.session_state.foundational_claim,  
+                                st.session_state.figure_analysis,  
+                                st.session_state.domain,  
+                                st.session_state.expertise,  
+                                st.session_state.style  
+                            )  
+                            if analysis_results:  
+                                st.session_state.filed_application_analysis = analysis_results  
+                                st.success("Filed application analysis completed successfully!")  
+                                docx_buffer = save_analysis_to_word(analysis_results)  
+                                if docx_buffer:  
+                                    filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
+                                    st.download_button(  
+                                        label="Download Analysis Results",  
+                                        data=docx_buffer,  
+                                        file_name=f"{filed_application_name}_ANALYSIS.docx",  
+                                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
+                                        key="filed_application_download"  
+                                    )  
+                            else:  
+                                st.error("Failed to analyze the filed application.")  
                         else:  
                             st.error("Failed to analyze the filed application.")  
                     else:  
-                        st.error("Failed to analyze the filed application.")  
+                        st.error("Failed to extract text from the filed application document.")  
                 else:  
-                    st.error("Failed to extract text from the filed application document.")  
-            else:  
-                st.warning("Please upload the filed application first.")  
+                    st.warning("Please upload the filed application first.")  
   
 # Step 4: Pending Claims  
 if st.session_state.get("filed_application_analysis") is not None:  
     with st.expander("Step 4: Pending Claims", expanded=True):  
         st.write("### Do you have a Pending Claims Document to Analyze?")  
         st.session_state.pending_claims_available = st.radio(  
-            "Select an option:",   
-            ("Yes", "No"),   
+            "Select an option:",  
+            ("Yes", "No"),  
             index=0 if st.session_state.pending_claims_available == "Yes" else 1  
         )  
   
         if st.session_state.pending_claims_available == "Yes":  
             st.write("### Upload the Pending Claims Document and Analyze")  
-            uploaded_pending_claims_file, analyze_pending_claims_clicked = create_uploader_and_button("Analyze Pending Claims", "pending_claims")  
+            uploaded_pending_claims_file, analyze_pending_claims_clicked = st.file_uploader("Upload Pending Claims Document", type=["pdf"]), st.button("Analyze Pending Claims")  
   
             if analyze_pending_claims_clicked:  
                 if uploaded_pending_claims_file is not None:  
@@ -1084,7 +1199,6 @@ if st.session_state.get("filed_application_analysis") is not None:
                     os.remove("temp_pending_claims.pdf")  
   
                     if extracted_pending_claims_text:  
-                        # Call extract_and_modify_filed_application first  
                         modified_filed_application_results = extract_and_modify_filed_application(  
                             st.session_state.filed_application_analysis,  
                             extracted_pending_claims_text,  
@@ -1093,11 +1207,9 @@ if st.session_state.get("filed_application_analysis") is not None:
                             st.session_state.style  
                         )  
                         if modified_filed_application_results:  
-                            # Store modified results in session state  
                             st.session_state.modified_filed_application_results = modified_filed_application_results  
                             st.success("Modified filed application analysis completed successfully!")  
-                              
-                            # Perform pending claims analysis  
+  
                             pending_claims_analysis_results = analyze_modified_application(  
                                 extracted_pending_claims_text,  
                                 st.session_state.foundational_claim,  
@@ -1108,11 +1220,9 @@ if st.session_state.get("filed_application_analysis") is not None:
                                 st.session_state.style  
                             )  
                             if pending_claims_analysis_results:  
-                                # Store results in session state  
                                 st.session_state.pending_claims_analysis = pending_claims_analysis_results  
                                 st.success("Pending claims analysis completed successfully!")  
   
-                                # Generate report for download  
                                 docx_buffer = save_analysis_to_word(pending_claims_analysis_results)  
                                 if docx_buffer:  
                                     filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
@@ -1131,6 +1241,7 @@ if st.session_state.get("filed_application_analysis") is not None:
                         st.error("Failed to extract text from the pending claims document.")  
                 else:  
                     st.warning("Please upload the pending claims document first.")  
+  
 # Option to download results if there are no pending claims  
 if st.session_state.get("filed_application_analysis") and st.session_state.pending_claims_analysis is None:  
     docx_buffer = save_analysis_to_word(st.session_state.filed_application_analysis)  
