@@ -553,14 +553,19 @@ def analyze_filed_application(extracted_details, foundational_claim, figure_anal
     {json.dumps(figure_analysis, indent=2)}  
     and the application as filed details:  
     {extracted_details}  
-    Assess whether the examiner's rejection of the application under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified by comparing it with the cited references text.  
-    Instructions:  
-    Key Features of Foundational Claim:
-
+    Assess whether the examiner's rejection of the application under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified by comparing it with the cited references text.
+IMPORTANT FORMATTING RULES:
+Numbering and Formatting:
+Use bullet points (•) instead of numbers when listing items.
+Do not include markdown formatting in your response.
+Bolden only the headings.
+Make your explanations lengthy and cite the sources correctly.
+Give amendments for all key features in foundational claim.
+Do NOT put N/A anywhere and enclose words within asterisks(**)
+Key Features of Foundational Claim:
 Extract and list the key features of the foundational claim.
 Ensure to include structural details, functional aspects, and any specific configurations mentioned in the claim.
-
-Key Features of Cited Reference:
+:Key Features of Cited Reference:
 Extract and list the key features of the cited reference.(also include where it is located in the cited text)
 Highlight any similarities or differences in structure, function, and configuration compared to the foundational claim.
 
@@ -581,11 +586,22 @@ Discuss any differences that might contribute to non-obviousness.
 
 Conclusion:
 Provide a conclusion on whether the examiner’s rejection under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified.
-Summarize the key points that support or refute the examiner’s rejection. 
-    Potential Areas for Distinction Listed  
-    Identify potential areas for distinction in the foundational claim. 
-    INSTRUCTIONS TO BE FOLLOWED WHILE PROPOSING AMENDMENTS:
-Guidance for Proposing Amendments and Arguments:
+Summarize the key points that support or refute the examiner’s rejection.
+
+Potential Areas for Distinction:
+Identify areas where the foundational claim can be distinguished from the cited reference.
+Focus on unique structural features, specific materials, configurations, or functions not disclosed in the cited reference.
+
+Proposed Amendments and Arguments:
+For each key feature point in the foundational claim, propose specific amendments separately. NOTE: for all the points in the foundational claim, it is mandatory to propose amendments.
+Present original and proposed versions, highlighting new features, specific materials, or configurations.
+Amendment [Number]: [Feature]
+Original: "[Original feature description...]"
+Proposed: "[Enhanced feature description with new details, specific materials, or configurations...]"
+Provide arguments supporting novelty and non-obviousness over the cited reference.
+Emphasize any technical advantages or improvements introduced by the amendments.
+IMPORTANT NOTE WHILE PROPOSING ARGUMENTS:
+'''\Guidance for Proposing Amendments and Arguments:
 When proposing amendments:
 
 Be Specific: Clearly identify which feature you are amending and provide detailed enhancements.
@@ -596,24 +612,17 @@ When crafting arguments to the examiner:
 Address Rejection Points: Directly counter the examiner's reasons for rejection by highlighting differences between the amended claim and the cited reference.
 Emphasize Novelty and Non-Obviousness: Explain why the amended features are new and not obvious, providing clear distinctions from the prior art.
 Use Supporting Evidence: Reference specific examples, embodiments, or descriptions in the application that support your arguments.
-Be Persuasive: Articulate the advantages and unique aspects of the invention that merit patent protection.
-    Proposed Amendments and Arguments  
-    Amendment to Foundational Claim for Each Key Feature Listed Separately with the New Features Highlighted:  
-        Amendment [Number]: [Feature]  
-        Original: "[Original feature description...]"  
-        Proposed: "[Enhanced feature description with new details, specific materials, or configurations...]"  
+Be Persuasive: Articulate the advantages and unique aspects of the invention that merit patent protection.\'''
 
- 
-        Provide arguments for novelty and non-obviousness over the cited reference.  
-    Identify Limitations in the Current Claims  
-    Identify limitations in the current claims and propose specific language or structural changes that address those limitations.  
-    Propose New Arguments or Amendments  
-    Suggest additional arguments or amendments that further distinguish the foundational claim from the prior art and strengthen the application. Include multiple amendments for thorough differentiation.
-    FORMATTING NOTES:
-     - Ensure the amendments maintain the original intent of the claims while improving clarity and scope.  
-      - Do the numbering in bullets and not in numbers. Do not use markdown formatting in your response.  
-      -Wherever U.S.C 102 is mentioned, it should be printed as U.S.C 102 (Lack of Novelty), and wherever U.S.C 103 is mentioned, it should be printed as U.S.C 103 (Obviousness).  
-     - Bold the key points.
+Identify Limitations in Current Claims:
+Identify any limitations or weaknesses in the current claims.
+Propose specific language or structural changes to address these limitations.
+Ensure that the proposed changes do not alter the original intent of the claims.
+
+Propose New Arguments or Amendments:
+Suggest additional arguments or amendments to further distinguish the foundational claim from the cited prior art.
+Include multiple amendments for thorough differentiation.
+Ensure that the original intent of the claims is maintained while improving clarity and scope.
     """  
   
     messages = [  
@@ -677,13 +686,18 @@ def analyze_modified_application(cited_references_text, foundational_claim, figu
     prompt = f"""  
     Analyze the modified application based on the foundational claim:{json.dumps(foundational_claim, indent=2)}and the figure analysis results:{json.dumps(figure_analysis, indent=2)}and the modified application details:{json.dumps(modified_application_details, indent=2)}and the cited references:{json.dumps(cited_references_text, indent=2)}  
 Assess whether the examiner's rejection of the application under U.S.C 102 (Lack of Novelty) or U.S.C 103 (Obviousness) is justified by comparing it with the cited references text.
-
+IMPORTANT FORMATTING RULES:
+Numbering and Formatting:
+Use bullet points (•) instead of numbers when listing items.
+Do not include markdown formatting in your response.
+Bolden only the headings.
+Make your explanations lengthy and cite the sources correctly.
+Give amendments for all key features in foundational claim.
+Do NOT put N/A anywhere and enclose words within asterisks(**)
 Key Features of Foundational Claim:
-
 Extract and list the key features of the foundational claim.
 Ensure to include structural details, functional aspects, and any specific configurations mentioned in the claim.
-
-Key Features of Cited Reference:
+:Key Features of Cited Reference:
 Extract and list the key features of the cited reference.(also include where it is located in the cited text)
 Highlight any similarities or differences in structure, function, and configuration compared to the foundational claim.
 
@@ -718,7 +732,7 @@ Original: "[Original feature description...]"
 Proposed: "[Enhanced feature description with new details, specific materials, or configurations...]"
 Provide arguments supporting novelty and non-obviousness over the cited reference.
 Emphasize any technical advantages or improvements introduced by the amendments.
-NOTE WHILE PROPOSING ARGUMENTS:
+IMPORTANT NOTE WHILE PROPOSING ARGUMENTS:
 '''\Guidance for Proposing Amendments and Arguments:
 When proposing amendments:
 
@@ -741,11 +755,6 @@ Propose New Arguments or Amendments:
 Suggest additional arguments or amendments to further distinguish the foundational claim from the cited prior art.
 Include multiple amendments for thorough differentiation.
 Ensure that the original intent of the claims is maintained while improving clarity and scope.
-NOTE:
-Numbering and Formatting:
-Use bullet points (•) instead of numbers when listing items.
-Do not include markdown formatting in your response.
-Bolden the key points.
     """  
       
     messages = [  
@@ -1035,13 +1044,13 @@ if st.session_state.get("conflict_results") is not None:
 if st.session_state.get("figure_analysis") is not None:  
     with st.expander("Step 3: Application as Filed", expanded=True):  
         st.write("### Is the Application Published?")  
-        is_published = st.radio("Select an option:", ("Yes", "No"), key="is_published_radio")  
+        is_published = st.radio("Select an option:", ("Yes", "No"))  
   
         if is_published == "No":  
             st.write("### Upload the DOCX and PDF to Combine and Analyze")  
-            word_file = st.file_uploader("Upload Word document", type=["docx"], key="word_file_uploader")  
-            pdf_file = st.file_uploader("Upload PDF document", type=["pdf"], key="pdf_file_uploader")  
-            combine_and_proceed_clicked = st.button("Combine and Proceed", key="combine_proceed_button")  
+            word_file = st.file_uploader("Upload Word document", type=["docx"])  
+            pdf_file = st.file_uploader("Upload PDF document", type=["pdf"])  
+            combine_and_proceed_clicked = st.button("Combine and Proceed")  
   
             if combine_and_proceed_clicked:  
                 if word_file and pdf_file:  
@@ -1050,98 +1059,93 @@ if st.session_state.get("figure_analysis") is not None:
                         pdf_path = os.path.join(tmpdirname, pdf_file.name)  
   
                         with open(word_path, "wb") as f:  
-                            f.write(word_file.read())  
+                            f.write(word_file.getbuffer())  
                         with open(pdf_path, "wb") as f:  
-                            f.write(pdf_file.read())  
+                            f.write(pdf_file.getbuffer())  
+  
+                        output_pdf_file = os.path.join(tmpdirname, "combined_document.pdf")  
   
                         with st.spinner("Converting Word to PDF..."):  
-                            converted_pdf_path = os.path.join(tmpdirname, "converted.pdf")  
-                            convert_success = convert_word_to_pdf(word_path, converted_pdf_path)  
-  
-                        if convert_success:  
+                            converted_pdf = convert_word_to_pdf(word_path, os.path.join(tmpdirname, "converted.pdf"))  
+                        if converted_pdf:  
                             with st.spinner("Merging PDFs..."):  
-                                output_pdf_file = os.path.join(tmpdirname, "combined_document.pdf")  
-                                merge_success = merge_pdfs([converted_pdf_path, pdf_path], output_pdf_file)  
+                                merged_pdf = merge_pdfs([converted_pdf, pdf_path], output_pdf_file)  
   
-                                if merge_success:  
-                                    st.success("DOCX and PDF have been successfully combined!")  
-                                    with open(output_pdf_file, "rb") as f:  
-                                        st.download_button(  
-                                            label="Download Combined PDF",  
-                                            data=f,  
-                                            file_name="combined_document.pdf",  
-                                            mime="application/pdf"  
-                                        )  
+                            st.success("DOCX and PDF have been successfully combined!")  
+                            with open(output_pdf_file, "rb") as f:  
+                                st.download_button(  
+                                    label="Download Combined PDF",  
+                                    data=f,  
+                                    file_name="combined_document.pdf",  
+                                    mime="application/pdf"  
+                                )  
   
-                                    # Proceed with Step 3 as the combined PDF is ready  
-                                    temp_pdf_path = "temp_filed.pdf"  
-                                    with open(temp_pdf_path, "wb") as f:  
-                                        f.write(open(output_pdf_file, "rb").read())  
+                            # Use the actual file name  
+                            st.session_state.filed_application_name = pdf_file.name  
   
-                                    extracted_filed_app_text = extract_text_from_pdf(temp_pdf_path)  
-                                    os.remove(temp_pdf_path)  
+                            # Proceed with Step 3 as the combined PDF is ready  
+                            with open("temp_filed.pdf", "wb") as f:  
+                                f.write(f.read())  
+                            extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
+                            os.remove("temp_filed.pdf")  
   
-                                    if extracted_filed_app_text:  
-                                        st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  
-                                        filed_app_details = extract_details_from_filed_application(  
-                                            extracted_filed_app_text,  
-                                            st.session_state.foundational_claim,  
-                                            st.session_state.domain,  
-                                            st.session_state.expertise,  
-                                            st.session_state.style  
-                                        )  
-                                        if filed_app_details:  
-                                            filed_app_details_json = json.dumps(filed_app_details, indent=2)  
-                                            st.session_state.filed_application_analysis = filed_app_details_json  
+                            if extracted_filed_app_text:  
+                                filed_app_details = extract_details_from_filed_application(  
+                                    extracted_filed_app_text,  
+                                    st.session_state.foundational_claim,  
+                                    st.session_state.domain,  
+                                    st.session_state.expertise,  
+                                    st.session_state.style  
+                                )  
+                                if filed_app_details:  
+                                    filed_app_details_json = json.dumps(filed_app_details, indent=2)  
+                                    st.session_state.filed_application_analysis = filed_app_details_json  
   
-                                            analysis_results = analyze_filed_application(  
-                                                filed_app_details_json,  
-                                                st.session_state.foundational_claim,  
-                                                st.session_state.figure_analysis,  
-                                                st.session_state.domain,  
-                                                st.session_state.expertise,  
-                                                st.session_state.style  
+                                    analysis_results = analyze_filed_application(  
+                                        filed_app_details_json,  
+                                        st.session_state.foundational_claim,  
+                                        st.session_state.figure_analysis,  
+                                        st.session_state.domain,  
+                                        st.session_state.expertise,  
+                                        st.session_state.style  
+                                    )  
+                                    if analysis_results:  
+                                        st.session_state.filed_application_analysis = analysis_results  
+                                        st.success("Filed application analysis completed successfully!")  
+                                        docx_buffer = save_analysis_to_word(analysis_results)  
+                                        if docx_buffer:  
+                                            filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
+                                            st.download_button(  
+                                                label="Download Analysis Results",  
+                                                data=docx_buffer,  
+                                                file_name=f"{filed_application_name}_ANALYSIS.docx",  
+                                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
+                                                key="filed_application_download"  
                                             )  
-                                            if analysis_results:  
-                                                st.session_state.filed_application_analysis = analysis_results  
-                                                st.success("Filed application analysis completed successfully!")  
-                                                docx_buffer = save_analysis_to_word(analysis_results)  
-                                                if docx_buffer:  
-                                                    filed_application_name = st.session_state.filed_application_name.replace(" ", "_")  
-                                                    st.download_button(  
-                                                        label="Download Analysis Results",  
-                                                        data=docx_buffer,  
-                                                        file_name=f"{filed_application_name}_ANALYSIS.docx",  
-                                                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
-                                                        key="filed_application_download"  
-                                                    )  
-                                            else:  
-                                                st.error("Failed to analyze the filed application.")  
-                                        else:  
-                                            st.error("Failed to analyze the filed application.")  
                                     else:  
-                                        st.error("Failed to extract text from the filed application document.")  
+                                        st.error("Failed to analyze the filed application.")  
                                 else:  
-                                    st.error("Failed to merge PDFs.")  
+                                    st.error("Failed to analyze the filed application.")  
+                            else:  
+                                st.error("Failed to extract text from the filed application document.")  
                         else:  
                             st.error("Failed to convert Word to PDF.")  
                 else:  
                     st.warning("Please upload both the DOCX and PDF files.")  
   
         elif is_published == "Yes":  
-            uploaded_filed_app = st.file_uploader("Upload Filed Application", type=["pdf"], key="filed_app_uploader")  
-            analyze_filed_app_clicked = st.button("Analyze Filed Application", key="analyze_filed_app_button")  
+            uploaded_filed_app = st.file_uploader("Upload Filed Application", type=["pdf"])  
+            analyze_filed_app_clicked = st.button("Analyze Filed Application")  
   
             if analyze_filed_app_clicked:  
                 if uploaded_filed_app is not None:  
-                    temp_pdf_path = "temp_filed.pdf"  
-                    with open(temp_pdf_path, "wb") as f:  
+                    with open("temp_filed.pdf", "wb") as f:  
                         f.write(uploaded_filed_app.read())  
-                    extracted_filed_app_text = extract_text_from_pdf(temp_pdf_path)  
-                    os.remove(temp_pdf_path)  
+                    extracted_filed_app_text = extract_text_from_pdf("temp_filed.pdf")  
+                    os.remove("temp_filed.pdf")  
   
                     if extracted_filed_app_text:  
-                        st.session_state.filed_application_name = "Published App US20240090598A1.pdf"  
+                        st.session_state.filed_application_name = uploaded_filed_app.name  
                         filed_app_details = extract_details_from_filed_application(  
                             extracted_filed_app_text,  
                             st.session_state.foundational_claim,  
@@ -1182,7 +1186,6 @@ if st.session_state.get("figure_analysis") is not None:
                         st.error("Failed to extract text from the filed application document.")  
                 else:  
                     st.warning("Please upload the filed application first.")  
-  
 # Step 4: Pending Claims  
 if st.session_state.get("filed_application_analysis") is not None:  
     with st.expander("Step 4: Pending Claims", expanded=True):  
@@ -1190,27 +1193,19 @@ if st.session_state.get("filed_application_analysis") is not None:
         st.session_state.pending_claims_available = st.radio(  
             "Select an option:",  
             ("Yes", "No"),  
-            index=0 if st.session_state.pending_claims_available == "Yes" else 1,  
-            key="pending_claims_radio"  
+            index=0 if st.session_state.pending_claims_available == "Yes" else 1  
         )  
   
         if st.session_state.pending_claims_available == "Yes":  
             st.write("### Upload the Pending Claims Document and Analyze")  
-            uploaded_pending_claims_file = st.file_uploader("Upload Pending Claims Document", type=["pdf", "docx"], key="pending_claims_uploader")  
-            analyze_pending_claims_clicked = st.button("Analyze Pending Claims", key="analyze_pending_claims_button")  
+            uploaded_pending_claims_file, analyze_pending_claims_clicked = st.file_uploader("Upload Pending Claims Document", type=["pdf"]), st.button("Analyze Pending Claims")  
   
             if analyze_pending_claims_clicked:  
                 if uploaded_pending_claims_file is not None:  
-                    temp_claims_path = "temp_pending_claims" + (".pdf" if uploaded_pending_claims_file.type == "application/pdf" else ".docx")  
-                    with open(temp_claims_path, "wb") as f:  
+                    with open("temp_pending_claims.pdf", "wb") as f:  
                         f.write(uploaded_pending_claims_file.read())  
-                      
-                    if temp_claims_path.endswith(".pdf"):  
-                        extracted_pending_claims_text = extract_text_from_pdf(temp_claims_path)  
-                    else:  
-                        extracted_pending_claims_text = extract_text_from_docx(temp_claims_path)  
-                      
-                    os.remove(temp_claims_path)  
+                    extracted_pending_claims_text = extract_text_from_pdf("temp_pending_claims.pdf")  
+                    os.remove("temp_pending_claims.pdf")  
   
                     if extracted_pending_claims_text:  
                         modified_filed_application_results = extract_and_modify_filed_application(  
@@ -1256,6 +1251,7 @@ if st.session_state.get("filed_application_analysis") is not None:
                 else:  
                     st.warning("Please upload the pending claims document first.")  
   
+# Option to download results if there are no pending claims  
 if st.session_state.get("filed_application_analysis") and st.session_state.pending_claims_analysis is None:  
     docx_buffer = save_analysis_to_word(st.session_state.filed_application_analysis)  
     if docx_buffer:  
@@ -1266,4 +1262,4 @@ if st.session_state.get("filed_application_analysis") and st.session_state.pendi
             file_name=f"{filed_application_name}_ANALYSIS.docx",  
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",  
             key="filed_application_final_download"  
-        ) 
+        )  
